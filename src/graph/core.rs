@@ -1,4 +1,5 @@
 use super::bulk;
+use crate::Vec;
 use crate::{
     Edge, EdgeEndpoints, EdgeIndex, GraphView, IndexGraphView, Node, NodeId, NodeIndex, Result,
     Topology,
@@ -219,17 +220,11 @@ impl GraphView for Graph {
         self.topology.edge_references()
     }
 
-    fn outgoing_edges(
-        &self,
-        node: NodeIndex,
-    ) -> impl DoubleEndedIterator<Item = EdgeIndex> + ExactSizeIterator + '_ {
+    fn outgoing_edges(&self, node: NodeIndex) -> impl Iterator<Item = EdgeIndex> + '_ {
         self.topology.outgoing_edges(node)
     }
 
-    fn incoming_edges(
-        &self,
-        node: NodeIndex,
-    ) -> impl DoubleEndedIterator<Item = EdgeIndex> + ExactSizeIterator + '_ {
+    fn incoming_edges(&self, node: NodeIndex) -> impl Iterator<Item = EdgeIndex> + '_ {
         self.topology.incoming_edges(node)
     }
 }
@@ -259,7 +254,7 @@ struct GraphWire {
 }
 
 impl<'de> Deserialize<'de> for Graph {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

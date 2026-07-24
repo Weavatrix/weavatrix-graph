@@ -1,4 +1,5 @@
-use std::fmt::{Display, Formatter};
+use crate::String;
+use core::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -50,10 +51,35 @@ pub enum GraphError {
     NegativeCycle {
         algorithm: &'static str,
     },
+    CyclicGraph {
+        algorithm: &'static str,
+    },
+    InvalidFormat {
+        format: &'static str,
+        reason: String,
+    },
+    UnsupportedGraphFeature {
+        format: &'static str,
+        feature: &'static str,
+    },
+    PayloadCountMismatch {
+        category: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidStableKey {
+        category: &'static str,
+        slot: u32,
+        generation: u32,
+    },
+    MissingKeyedNode {
+        endpoint: &'static str,
+    },
+    CycleWouldBeCreated,
 }
 
 impl Display for GraphError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::EmptyNodeId => formatter.write_str("node id must not be empty"),
             Self::InvalidKind { category, value } => {
@@ -110,10 +136,41 @@ impl Display for GraphError {
             Self::NegativeCycle { algorithm } => {
                 write!(formatter, "{algorithm} found a reachable negative cycle")
             }
+            Self::CyclicGraph { algorithm } => {
+                write!(formatter, "{algorithm} requires an acyclic graph")
+            }
+            Self::InvalidFormat { format, reason } => {
+                write!(formatter, "invalid {format} input: {reason}")
+            }
+            Self::UnsupportedGraphFeature { format, feature } => {
+                write!(formatter, "{format} does not support {feature}")
+            }
+            Self::PayloadCountMismatch {
+                category,
+                expected,
+                actual,
+            } => write!(
+                formatter,
+                "{category} payload count {actual} does not match topology count {expected}"
+            ),
+            Self::InvalidStableKey {
+                category,
+                slot,
+                generation,
+            } => write!(
+                formatter,
+                "{category} key at slot {slot}, generation {generation} is stale or invalid"
+            ),
+            Self::MissingKeyedNode { endpoint } => {
+                write!(formatter, "keyed graph {endpoint} node does not exist")
+            }
+            Self::CycleWouldBeCreated => {
+                formatter.write_str("mutation would violate the acyclic graph invariant")
+            }
         }
     }
 }
 
-impl std::error::Error for GraphError {}
+impl core::error::Error for GraphError {}
 
-pub type Result<T> = std::result::Result<T, GraphError>;
+pub type Result<T> = core::result::Result<T, GraphError>;

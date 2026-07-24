@@ -1,5 +1,6 @@
 use crate::IndexGraphView;
-use std::collections::VecDeque;
+use crate::Vec;
+use alloc::collections::VecDeque;
 
 #[must_use]
 pub fn topological_sort<G>(graph: &G) -> Option<Vec<G::Node>>
@@ -16,6 +17,26 @@ where
     F: Fn(G::Edge) -> bool,
 {
     sort_with_filter(graph, &allows_edge)
+}
+
+#[must_use]
+pub fn topological_generations<G>(graph: &G) -> Option<Vec<Vec<G::Node>>>
+where
+    G: IndexGraphView,
+{
+    generations_with_filter(graph, &|_| true)
+}
+
+#[must_use]
+pub fn topological_generations_filtered<G, F>(
+    graph: &G,
+    allows_edge: F,
+) -> Option<Vec<Vec<G::Node>>>
+where
+    G: IndexGraphView,
+    F: Fn(G::Edge) -> bool,
+{
+    generations_with_filter(graph, &allows_edge)
 }
 
 #[must_use]
@@ -90,6 +111,48 @@ where
         }
     }
     (order.len() == graph.node_count()).then_some(order)
+}
+
+fn generations_with_filter<G, F>(graph: &G, allows_edge: &F) -> Option<Vec<Vec<G::Node>>>
+where
+    G: IndexGraphView,
+    F: Fn(G::Edge) -> bool,
+{
+    let mut indegree = vec![0_usize; graph.node_bound()];
+    for (edge, endpoints) in graph.edge_references() {
+        if allows_edge(edge) {
+            indegree[G::node_slot(endpoints.target())] += 1;
+        }
+    }
+    let mut ready = graph
+        .node_indices()
+        .filter(|node| indegree[G::node_slot(*node)] == 0)
+        .collect::<Vec<_>>();
+    let mut generations = Vec::new();
+    let mut visited = 0_usize;
+    while !ready.is_empty() {
+        visited += ready.len();
+        let generation = ready;
+        let mut next = Vec::new();
+        for &node in &generation {
+            for edge in graph.outgoing_edges(node) {
+                if !allows_edge(edge) {
+                    continue;
+                }
+                let Some(endpoints) = graph.edge_endpoints(edge) else {
+                    continue;
+                };
+                let degree = &mut indegree[G::node_slot(endpoints.target())];
+                *degree = degree.saturating_sub(1);
+                if *degree == 0 {
+                    next.push(endpoints.target());
+                }
+            }
+        }
+        generations.push(generation);
+        ready = next;
+    }
+    (visited == graph.node_count()).then_some(generations)
 }
 
 fn find_with_filter<G, F>(graph: &G, allows_edge: &F) -> Option<Vec<G::Node>>

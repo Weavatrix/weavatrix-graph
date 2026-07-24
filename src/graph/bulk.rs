@@ -1,7 +1,8 @@
 use super::core::Graph;
-use super::index::{canonicalize_edges, index_canonical_edges};
+use super::index::{canonicalize_edges, index_sorted_edges};
 use super::validate::{validate_edge, validate_node};
 use crate::{Edge, GraphError, Node, Result};
+use crate::{ToString, Vec};
 
 pub(super) fn canonical(
     nodes: impl IntoIterator<Item = Node>,
@@ -44,7 +45,7 @@ pub(super) fn from_sorted_parts(nodes: Vec<Node>, mut edges: Vec<Edge>) -> Resul
         validate_edge(edge)?;
     }
     edges.dedup();
-    let topology = index_canonical_edges(&nodes, &edges)?;
+    let topology = index_sorted_edges(&nodes, &edges)?;
     Ok(Graph::from_indexed_parts(nodes, edges, topology))
 }
 

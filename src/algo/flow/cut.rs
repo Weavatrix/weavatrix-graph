@@ -1,5 +1,6 @@
 use crate::IndexGraphView;
-use std::collections::VecDeque;
+use crate::Vec;
+use alloc::collections::VecDeque;
 
 pub(super) fn indexed_nodes<G: IndexGraphView>(graph: &G) -> Vec<Option<G::Node>> {
     let mut nodes = vec![None; graph.node_bound()];

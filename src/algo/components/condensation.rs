@@ -1,18 +1,17 @@
 use super::scc;
+use crate::Vec;
 use crate::{EdgeEndpoints, GraphError, IndexGraphView, NodeIndex, Result, Topology};
-use std::collections::HashMap;
-use std::hash::Hash;
 
 #[derive(Clone, Debug)]
 pub struct Condensation<Node> {
     components: Vec<Vec<Node>>,
-    component_by_node: HashMap<Node, NodeIndex>,
+    component_by_node: Vec<(Node, NodeIndex)>,
     topology: Topology,
 }
 
 impl<Node> Condensation<Node>
 where
-    Node: Copy + Eq + Hash,
+    Node: Copy + Eq,
 {
     #[must_use]
     pub fn components(&self) -> &[Vec<Node>] {
@@ -26,7 +25,9 @@ where
 
     #[must_use]
     pub fn component_of(&self, node: Node) -> Option<NodeIndex> {
-        self.component_by_node.get(&node).copied()
+        self.component_by_node
+            .iter()
+            .find_map(|&(candidate, index)| (candidate == node).then_some(index))
     }
 
     #[must_use]
@@ -77,7 +78,7 @@ where
     G: IndexGraphView,
     F: Fn(G::Edge) -> bool,
 {
-    let mut component_by_node = HashMap::with_capacity(graph.node_count());
+    let mut component_by_node = Vec::with_capacity(graph.node_count());
     let mut component_by_slot = vec![None; graph.node_bound()];
     for (position, component) in components.iter().enumerate() {
         let compact = u32::try_from(position).map_err(|_| GraphError::IndexCapacityExceeded {
@@ -86,7 +87,7 @@ where
         })?;
         for &node in component {
             let index = NodeIndex::new(compact);
-            component_by_node.insert(node, index);
+            component_by_node.push((node, index));
             if let Some(slot) = component_by_slot.get_mut(G::node_slot(node)) {
                 *slot = Some(index);
             }

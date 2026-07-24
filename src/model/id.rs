@@ -1,8 +1,8 @@
-use crate::{GraphError, Result};
+use crate::{GraphError, Result, String};
+use core::borrow::Borrow;
+use core::fmt::{Display, Formatter};
+use core::str::FromStr;
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
-use std::borrow::Borrow;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
@@ -30,7 +30,7 @@ impl NodeId {
 }
 
 impl Display for NodeId {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
         formatter.write_str(&self.0)
     }
 }
@@ -50,7 +50,7 @@ impl FromStr for NodeId {
 }
 
 impl<'de> Deserialize<'de> for NodeId {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

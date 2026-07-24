@@ -9,7 +9,7 @@ pub(crate) fn validate_node(node: &Node) -> Result<()> {
     {
         return Err(GraphError::InvalidKind {
             category: "language",
-            value: language.to_owned(),
+            value: crate::String::from(language),
         });
     }
     Ok(())

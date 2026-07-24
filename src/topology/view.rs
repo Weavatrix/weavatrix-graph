@@ -1,6 +1,6 @@
 use super::NodeIndex;
+use core::hash::Hash;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EdgeEndpoints<Node = NodeIndex> {
@@ -54,15 +54,9 @@ pub trait GraphView {
             .filter_map(|edge| self.edge_endpoints(edge).map(|endpoints| (edge, endpoints)))
     }
 
-    fn outgoing_edges(
-        &self,
-        node: Self::Node,
-    ) -> impl DoubleEndedIterator<Item = Self::Edge> + ExactSizeIterator + '_;
+    fn outgoing_edges(&self, node: Self::Node) -> impl Iterator<Item = Self::Edge> + '_;
 
-    fn incoming_edges(
-        &self,
-        node: Self::Node,
-    ) -> impl DoubleEndedIterator<Item = Self::Edge> + ExactSizeIterator + '_;
+    fn incoming_edges(&self, node: Self::Node) -> impl Iterator<Item = Self::Edge> + '_;
 }
 
 pub trait IndexGraphView: GraphView {

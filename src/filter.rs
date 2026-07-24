@@ -1,4 +1,5 @@
 use crate::{Confidence, Edge, EdgeKind, EvidenceKind};
+use crate::{String, Vec};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct EdgeFilter {

@@ -1,6 +1,6 @@
 [package]
 name = "weavatrix-graph"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 rust-version = "1.88"
 description = "Deterministic, evidence-carrying graph primitives for repository intelligence"
@@ -13,13 +13,25 @@ readme = "README.md"
 keywords = ["graph", "code-graph", "static-analysis", "provenance", "architecture"]
 categories = ["data-structures", "development-tools"]
 
+[features]
+default = ["std"]
+std = ["serde/std"]
+rayon = ["std", "dep:rayon"]
+unsafe-fast = []
+
 [dependencies]
-serde = { version = "1.0.229", features = ["derive"] }
+rayon = { version = "1.11.0", optional = true }
+serde = { version = "1.0.229", default-features = false, features = ["alloc", "derive"] }
 
 [dev-dependencies]
+biconnected-components = "0.5.0"
 graaf = "0.112.0"
-petgraph = { version = "0.8.3", default-features = false, features = ["std"] }
+petgraph = { version = "0.8.3", default-features = false, features = ["std", "stable_graph"] }
+rustworkx-core = "0.18.0"
 serde_json = "1.0.151"
+
+[target.'cfg(not(windows))'.dev-dependencies]
+proptest = "1.9.0"
 
 [[bench]]
 name = "graph_builder"
@@ -49,8 +61,45 @@ harness = false
 name = "advanced_algorithm_competitors"
 harness = false
 
+[[bench]]
+name = "p0_algorithm_competitors"
+harness = false
+
+[[bench]]
+name = "p1_algorithm_competitors"
+harness = false
+
+[[bench]]
+name = "p2_capabilities"
+harness = false
+required-features = ["rayon", "unsafe-fast"]
+
+[[bench]]
+name = "p0_strengthening_competitors"
+harness = false
+
+[[bench]]
+name = "scale_graph_competitors"
+harness = false
+
+[[bench]]
+name = "connectivity_link_analysis"
+harness = false
+
+[[bench]]
+name = "distance_chain_analysis"
+harness = false
+
+[[bench]]
+name = "edge_cut_analysis"
+harness = false
+
+[[bench]]
+name = "keyed_stable_structures"
+harness = false
+
 [lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

@@ -25,20 +25,63 @@ an MCP/CLI transport.
 - deterministic node and edge order independent of insertion order;
 - compact numeric endpoints with incoming and outgoing CSR indexes;
 - a mutable insertion-order graph with generation-stable node and edge keys;
+- allocation-reusing lazy BFS, DFS, and generic Dijkstra iterators, early
+  stopping, DFS events, and reusable workspaces;
+- generic checked integer and finite floating-point path costs through the
+  `Measure` trait;
 - BFS, DFS, reachability, unweighted shortest paths, Dijkstra, A*, signed
   Bellman-Ford, filtered SCC, weak components, condensation DAGs, cycle
   discovery, topological sort, MST, and Dinic maximum flow;
 - standard `PageRank` with dangling-mass redistribution, control-flow dominators,
-  and deterministic DAG transitive reduction plus closure;
+  dominance frontiers, deterministic DAG longest paths and topological
+  generations, and DAG transitive reduction plus closure;
+- Floyd-Warshall and Johnson all-pairs shortest paths, bounded simple and
+  K-shortest paths, bounded elementary circuit enumeration, undirected bridges
+  and articulation points, iterative vertex-biconnected edge blocks, exact
+  eccentricity/radius/diameter/center/periphery analytics, deterministic
+  multigraph-safe chain decomposition, checked weighted Stoer-Wagner global
+  min-cut, and label-aware graph/subgraph isomorphism;
+- bidirectional Dijkstra and queue-based SPFA with checked arithmetic and
+  reachable-negative-cycle reporting;
+- bipartite partitioning, Hopcroft-Karp maximum bipartite matching, and bounded
+  Bron-Kerbosch maximal-clique enumeration;
+- exact general-graph maximum matching with Edmonds blossoms and deterministic
+  DSATUR coloring;
+- deterministic Eades feedback-arc approximation and a multi-start
+  metric-closure Steiner-tree approximation that retains the standard
+  two-approximation candidate;
+- degree, closeness, node/edge betweenness, Katz, eigenvector, and HITS
+  hub/authority centrality, plus k-core, cycle-basis, and deterministic
+  label-propagation community analysis;
+- Edmonds-Karp, push-relabel, min-cost maximum flow, and Prim spanning forests
+  alongside Dinic and Kruskal;
+- zero-copy reversed, edge-filtered, and induced-subgraph views, plus
+  complement and union operators;
 - edge-kind, evidence, extractor, confidence, and caller-defined traversal
   filters;
-- undirected incidence CSR, a generic dense matrix, and deterministic random
-  graph generators;
+- automatic Floyd-Warshall/Johnson selection with the selected strategy exposed
+  to callers;
+- deterministic DOT, Graph6, and `GraphML` topology interchange;
+- undirected incidence CSR, a generic dense matrix, a bit-packed adjacency
+  matrix, and deterministic seeded graph generators;
+- generic directed and undirected payload graphs alongside the
+  evidence-carrying model;
+- optional Rayon batch traversal, shortest-path queries, Johnson APSP,
+  closeness, and node/edge betweenness centrality;
+- a generic mutable payload graph with compact intrusive adjacency, generation
+  keys, mapping, compaction, and an acyclic invariant wrapper;
+- a GraphMap-style keyed payload index backed by generation-stable handles, plus
+  a mutable undirected payload graph with O(1) intrusive incidence updates;
+- `no_std + alloc` support with the default `std` feature kept for faster
+  hash-backed rich graph construction;
 - idempotent insertion of identical nodes and edges;
 - rejection of conflicting nodes, dangling edges, and invalid source spans;
 - validated deserialization that cannot bypass graph invariants;
 - compatibility conversion from Weavatrix's legacy `{ nodes, links }` graph;
-- no unsafe code and one runtime dependency: `serde`.
+- no unsafe code in the default or featureless `no_std` build; the opt-in
+  `unsafe-fast` feature is confined to one audited bit-matrix module;
+- the default build has one runtime dependency, `serde`, while the optional
+  `rayon` feature is isolated from the core.
 
 ## Layered graph contracts
 
@@ -52,12 +95,24 @@ for every feature:
 | `Graph` | Immutable evidence snapshot and wire format | Sorts, deduplicates, validates, and emits canonical output |
 | `UndirectedTopology` | General-purpose undirected algorithms | Compact incidence CSR with parallel-edge and self-loop support |
 | `DenseMatrix<T>` | Small dense graphs | Fixed-size O(1) edge lookup without sparse-graph overhead |
+| `BitMatrix` | Large dense boolean relations | One bit per possible directed edge with safe O(1) lookup |
+| `PayloadGraph<N, E>` | Arbitrary application payloads | Validated topology plus separately owned node and edge values |
+| `StablePayloadGraph<N, E>` | Generic mutable application graph | Generation-checked stable keys, compact intrusive adjacency, payload mapping, and immutable `freeze()` |
+| `KeyedPayloadGraph<K, N, E>` | Domain-key lookup and mutation | Hash-backed under `std`, deterministic tree-backed under `no_std`, stable handles for algorithms |
+| `StableUndirectedPayloadGraph<N, E>` | Mutable undirected multigraph | Generation-checked node/edge keys, intrusive double-ended incidence, parallel edges, self-loops, retargeting, and compact `freeze()` |
+| `AcyclicPayloadGraph<N, E>` | Mutable DAG workflows | Rejects cycle-creating inserts and edge retargeting |
 
 `WorkingGraph::freeze()` is the explicit boundary between extraction and
 publication. It returns the canonical `Graph` plus a stable-to-compact index
 map. `Graph::try_from_sorted_nodes` avoids rebuilding the node-id map when an
 extractor already emits unique sorted nodes, while
 `Graph::try_from_sorted_parts` is the fastest fully canonical input path.
+
+`KeyedPayloadGraph` keeps application keys out of algorithm internals: lookups
+resolve to `StableNodeKey`, while its inner `StablePayloadGraph` implements the
+shared graph views. `StableUndirectedPayloadGraph` implements
+`IndexUndirectedGraphView` directly, so BCC, MST, matching, coloring, and other
+undirected algorithms run before or after mutation without an adapter.
 
 ## Example
 
@@ -167,6 +222,129 @@ assert!(dominators(&graph, NodeIndex::new(0)).is_some());
 # Ok::<(), weavatrix_graph::GraphError>(())
 ```
 
+All potentially exponential enumeration APIs require a caller-provided result
+limit and report truncation. Isomorphism accepts node and edge predicates, so
+architecture tools can match semantic kinds without coupling the graph crate to
+one language model:
+
+```rust
+use weavatrix_graph::{
+    EdgeEndpoints, NodeIndex, SubgraphMode, Topology, johnson_all_pairs,
+    subgraph_isomorphisms,
+};
+
+let graph = Topology::try_from_edges(
+    3,
+    [(0, 1), (1, 2)].map(|(source, target)| {
+        EdgeEndpoints::new(NodeIndex::new(source), NodeIndex::new(target))
+    }),
+)?;
+let paths = johnson_all_pairs(&graph, |_| 1)?;
+assert_eq!(paths.distance(NodeIndex::new(0), NodeIndex::new(2)), Some(2));
+
+let matches = subgraph_isomorphisms(
+    &graph,
+    &graph,
+    SubgraphMode::Induced,
+    1,
+    |left, right| left == right,
+    |_, _| true,
+);
+assert_eq!(matches.mappings().len(), 1);
+# Ok::<(), weavatrix_graph::GraphError>(())
+```
+
+Biconnected and chain analysis are iterative and preserve original edge IDs.
+Both treat parallel edges and self-loops explicitly. Exact distance analytics
+return `None` for an empty or disconnected accepted-edge graph rather than
+inventing finite metrics. HITS ranks topological relationships rather than
+evidence multiplicity: equal endpoint pairs are deduplicated after the semantic
+edge predicate runs once per edge.
+
+```rust
+use weavatrix_graph::{
+    EdgeEndpoints, NodeIndex, Topology, UndirectedTopology,
+    biconnected_components, chain_decomposition, distance_analytics, hits,
+    stoer_wagner_min_cut, undirected_edge_betweenness_centrality,
+};
+
+let edges = [(0, 1), (1, 2), (2, 0), (1, 3)].map(|(source, target)| {
+    EdgeEndpoints::new(NodeIndex::new(source), NodeIndex::new(target))
+});
+let undirected = UndirectedTopology::try_from_edges(4, edges)?;
+let blocks = biconnected_components(&undirected);
+assert_eq!(blocks.component_count(), 2);
+assert_eq!(blocks.articulation_points(), &[NodeIndex::new(1)]);
+let distances = distance_analytics(&undirected).expect("connected graph");
+assert_eq!(distances.diameter(), 2);
+assert_eq!(distances.center(), &[NodeIndex::new(1)]);
+let chains = chain_decomposition(&undirected);
+assert_eq!(chains.chain_count(), 1);
+let edge_scores = undirected_edge_betweenness_centrality(&undirected, true);
+assert_eq!(edge_scores.len(), 4);
+let cut = stoer_wagner_min_cut(&undirected, |_| 1_u64)?.expect("four nodes");
+assert_eq!(cut.weight(), 1);
+assert_eq!(cut.partition(), &[NodeIndex::new(3)]);
+
+let directed = Topology::try_from_edges(4, edges)?;
+let scores = hits(&directed, 100, 1e-10)?;
+assert!(scores.hub(NodeIndex::new(1)).is_some());
+# Ok::<(), weavatrix_graph::GraphError>(())
+```
+
+## P2 storage, interchange, and portability
+
+`all_pairs_auto` snapshots every accepted edge weight once, selects
+Floyd-Warshall for small or dense graphs and Johnson for sparse graphs, and
+returns the chosen `AllPairsStrategy` with the result. Explicit algorithms
+remain available when an application already knows the best strategy.
+
+Interchange intentionally targets deterministic topology rather than pretending
+to support every dialect:
+
+- DOT reads and writes a strict numeric directed/undirected subset and ignores
+  attributes;
+- Graph6 supports simple undirected graphs and rejects loops and parallel edges;
+- `GraphML` preserves graph direction and node declaration order while rejecting
+  ports, hyperedges, and per-edge direction overrides.
+
+All decoders validate endpoint references and rebuild the crate's canonical
+topology indexes. `PayloadGraph<N, E>` and `UndirectedPayloadGraph<N, E>` attach
+arbitrary payloads without weakening those topology invariants.
+
+The crate defaults to `std`. Embedded and WASM consumers can disable default
+features for a real `no_std + alloc` build:
+
+```toml
+[dependencies]
+weavatrix-graph = { version = "0.5", default-features = false }
+```
+
+Parallel batches are explicit and optional:
+
+```toml
+[dependencies]
+weavatrix-graph = { version = "0.5", features = ["rayon"] }
+```
+
+`bfs_batch_parallel` and `dijkstra_batch_parallel` preserve query order and the
+same deterministic result contract as their sequential counterparts. They are
+intended for batches large enough to amortize scheduling, not as replacements
+for a single small query.
+
+Bit-matrix lookup has an additional, separately auditable performance feature:
+
+```toml
+[dependencies]
+weavatrix-graph = { version = "0.5", features = ["unsafe-fast"] }
+```
+
+The default `BitMatrix::contains` remains fully safe. With `unsafe-fast`,
+`contains_fast` keeps a safe API and validates both endpoints before one
+unchecked word access. `contains_unchecked` removes endpoint checks too and is
+an `unsafe fn`: callers must guarantee that both indexes are inside the matrix.
+Enabling the feature never silently changes the behavior of `contains`.
+
 ## Extension Kinds
 
 Known relation and node kinds are enum variants. Ecosystem-specific kinds remain
@@ -226,9 +404,10 @@ comparisons with `petgraph 0.8.3` and `graaf 0.112.0`:
 cargo bench --locked
 ```
 
-Each workload runs two warmups and 11 measured iterations. The tables below use
-the median of five independent harness medians on Windows 11 with Rust 1.97.1.
-They compare equal contracts where possible and label preprocessing explicitly.
+Unless a section states otherwise, each workload runs two warmups and 11
+measured iterations. The tables below use the median of five independent
+harness medians on Windows 11 with Rust 1.97.1. They compare equal contracts
+where possible and label preprocessing explicitly.
 
 ### Rich evidence construction
 
@@ -236,16 +415,19 @@ They compare equal contracts where possible and label preprocessing explicitly.
 
 | Mode | Library | Median |
 | --- | --- | ---: |
-| Unsorted canonical snapshot | weavatrix-graph `Graph` | 32.862 ms |
-| Sorted canonical snapshot | weavatrix-graph `Graph` | 19.059 ms |
-| Validated mutable append | weavatrix-graph `WorkingGraph` | 19.551 ms |
-| Payload append, no canonicalization | petgraph adapter | 20.215 ms |
-| Mutable append plus canonical `freeze()` | weavatrix-graph | 45.495 ms |
+| Unsorted canonical snapshot | weavatrix-graph `Graph` | 40.725 ms |
+| Sorted canonical snapshot | weavatrix-graph `Graph` | 23.427 ms |
+| Validated mutable append | weavatrix-graph `WorkingGraph` | 35.362 ms |
+| Payload append, no canonicalization | petgraph adapter | 18.372 ms |
+| Mutable append plus canonical `freeze()` | weavatrix-graph | 47.199 ms |
 
 The petgraph adapter resolves string ids and clones the same payload but does
 not validate, sort, or deduplicate it. `WorkingGraph` remains slightly faster
-while validating local invariants. `freeze()` is reported separately because it
-adds canonical sorting, evidence deduplication, and immutable CSR construction.
+than full canonical construction while validating local invariants.
+`freeze()` is reported separately because it adds canonical sorting, evidence
+deduplication, and immutable CSR construction. At repository scale the sorted
+canonical implementation amortizes those guarantees and moves ahead of the
+narrower adapter; see the 200,000 / 1,000,000 table below.
 
 ### Compact dual CSR
 
@@ -267,22 +449,73 @@ when a caller already owns both orders.
 
 | Algorithm | weavatrix-graph | petgraph |
 | --- | ---: | ---: |
-| BFS | 0.095 ms | 0.125 ms |
-| Strongly connected components | 0.333 ms | 0.606 ms |
-| Dijkstra to one target | 0.783 ms | 1.036 ms |
-| Minimum spanning forest | 1.042 ms | 1.599 ms |
-| Dinic maximum flow | 0.276 ms | 0.284 ms |
+| BFS | 0.107 ms | 0.157 ms |
+| Strongly connected components | 0.474 ms | 0.650 ms |
+| Dijkstra to one target | 0.913 ms | 0.960 ms |
+| Minimum spanning forest | 1.288 ms | 1.856 ms |
+| Dinic maximum flow | 0.322 ms | 0.379 ms |
 
 Deterministic randomized differential tests also compare reachability, shortest
 path existence and cost, SCC partitions, cycle status, topological feasibility,
 MST weight, and maximum-flow value against petgraph.
 
+### Repository scale: 200,000 nodes and 1,000,000 edges
+
+`scale_graph_competitors` models files as nodes and deterministic dependency
+relations as directed edges. Each independent process performs one warmup and
+five measured iterations; the table is the median of five process medians.
+Every process asserts exact node and edge counts, equal reachable counts, equal
+SCC partitions, and the same target distance before reporting timings.
+
+| Contract | weavatrix-graph | Competitor | Result |
+| --- | ---: | ---: | --- |
+| Dual CSR from arbitrary unique endpoints | 14.391 ms | petgraph adapter 78.735 ms | 5.47x faster |
+| Narrow baseline: both directions pre-sorted for petgraph | 14.391 ms | petgraph 12.895 ms | petgraph 11.6% faster |
+| Mutable append, no reverse CSR or canonicalization | — | petgraph 9.934 ms / graaf 30.969 ms | narrower contract |
+| BFS, materialized reachable nodes | 13.026 ms | petgraph 49.606 ms / graaf 34.896 ms | 3.81x / 2.68x faster |
+| Strongly connected components | 92.304 ms | petgraph 316.340 ms | 3.43x faster |
+| Dijkstra to one target | 69.190 ms | petgraph 102.050 ms | 1.47x faster |
+| Rich evidence snapshot from sorted owned payloads | 623.691 ms | petgraph adapter 644.840 ms | 3.4% faster |
+
+The generated workload contains no duplicate endpoint pair. Weavatrix validates
+the arbitrary endpoints and builds both directions by linear counting placement
+while retaining stable original edge indexes and support for parallel edges.
+The equal-input petgraph adapter must produce, sort, and deduplicate two edge
+orders for its simple CSR contract. Its pre-sorted row receives both orders
+already prepared and therefore measures a deliberately narrower input
+contract. Mutable append is shown only as a lower-bound reference because it
+does not build an immutable dual-CSR snapshot.
+
+The rich adapter resolves the same string ids and moves the same node/edge
+payloads, but does not validate payloads, check canonical ordering, deduplicate
+evidence, or build reverse CSR. The 6.2% construction premium is therefore the
+remaining scale tradeoff for the stronger snapshot contract, not an
+algorithmic correctness gap.
+
+Median peak working set from three fresh processes, including input generation,
+temporary construction storage, allocator high-water state, and the live
+result:
+
+| Construction | weavatrix-graph | Competitor |
+| --- | ---: | ---: |
+| Compact dual CSR | 37.9 MiB | petgraph dual CSR 68.5 MiB |
+| Mutable adjacency | — | petgraph 44.9 MiB / graaf 47.5 MiB |
+| Rich evidence graph, ownership transferred | 377.1 MiB | petgraph adapter 585.8 MiB |
+
+Peak working set is a capacity-planning number, not the retained deep size of
+the graph. Reproduce the scale run with:
+
+```sh
+cargo bench --locked --all-features --bench scale_graph_competitors
+```
+
 ### Advanced algorithms
 
-The A* and dominator workloads use 10,000 nodes / 30,000 edges. Bellman-Ford
-uses a 1,000-node / 5,000-edge signed DAG, `PageRank` uses 500 nodes / 2,000
-unique edges and 20 iterations, and DAG reduction/closure uses 512 nodes /
-3,000 edges. Values are the median of five independent harness medians:
+The A*, dominator, and DAG-intelligence workloads use 10,000 nodes / 30,000
+edges. Bellman-Ford uses a 1,000-node / 5,000-edge signed DAG, `PageRank` uses
+500 nodes / 2,000 unique edges and 20 iterations, and DAG reduction/closure
+uses 512 nodes / 3,000 edges. Values are the median of five independent harness
+medians:
 
 | Algorithm | weavatrix-graph | petgraph | Result |
 | --- | ---: | ---: | --- |
@@ -290,6 +523,9 @@ unique edges and 20 iterations, and DAG reduction/closure uses 512 nodes /
 | Bellman-Ford, distances and predecessors | 0.057 ms | 0.033 ms | 1.73x slower |
 | `PageRank`, 20 iterations | 0.071 ms | 12.892 ms | 181.58x faster |
 | Immediate dominators | 2.161 ms | 3.163 ms | 1.46x faster |
+| Maximum-cost DAG path | 0.496 ms | 0.628 ms adapter | 1.27x faster |
+| Topological generations | 0.655 ms | 0.804 ms adapter | 1.23x faster |
+| Dominance frontiers | 4.081 ms | 6.151 ms adapter | 1.51x faster |
 | DAG transitive reduction and closure | 0.684 ms | 1.051 ms | 1.54x faster |
 
 The DAG row includes `petgraph`'s required conversion to a topologically ordered
@@ -306,7 +542,193 @@ addition, distinguishes unreachable nodes without an infinity sentinel, and
 returns overflow or reachable-negative-cycle errors. `petgraph` uses `f64`
 distances and does not provide integer overflow semantics. Randomized
 differential tests cover A* costs, Bellman-Ford distances and negative-cycle
-status, immediate dominators, and exact transitive reduction/closure edges.
+status, immediate dominators, longest-path costs, topological generation
+invariants, dominance-frontier memberships, and exact transitive
+reduction/closure edges. Petgraph does not expose the three DAG-intelligence
+operations directly; those rows use equal-output adapters over its graph,
+topological-sort, and immediate-dominator APIs.
+
+### P0 all-pairs, cuts, and isomorphism
+
+Local Windows release-mode sample from 2026-07-24, with two warmups and the
+median of 11 measured runs over deterministic synthetic graphs:
+
+| Contract | Workload | weavatrix-graph | petgraph |
+| --- | --- | ---: | ---: |
+| Floyd-Warshall APSP | 160 nodes / 1,200 weighted edges | 2.874 ms | 3.319 ms |
+| Johnson APSP | 800 nodes / 4,000 weighted edges | 52.636 ms | 67.018 ms |
+| Bridges plus articulation points | 5,000 nodes / 15,000 edges | 0.362 ms | 0.302 ms bridges only |
+| Exact directed isomorphism | 64 nodes / 300 edges | 0.100 ms | 0.031 ms |
+
+The cuts row is deliberately marked as a different contract rather than a speed
+win: our traversal returns both cut-edge and cut-vertex evidence. Isomorphism is
+a known optimization gap. Randomized differential tests compare APSP distances,
+bridges, articulation points, and exact isomorphism against `petgraph 0.8.3`.
+Integer Floyd-Warshall additionally preserves unreachable pairs as `None`
+instead of allowing a negative edge to modify an infinity sentinel.
+
+### Biconnected structure and HITS
+
+Biconnected components use 2,000 nodes / 6,000 simple undirected edges. HITS
+uses 10,000 nodes / 30,000 unique directed relationships, an iteration cap of
+100, and tolerance `1e-10`. Values are the median of five independent harness
+medians:
+
+| Contract | weavatrix-graph | Reference | Result |
+| --- | ---: | ---: | --- |
+| Biconnected edge blocks plus articulation points | 0.225 ms | equal-output adapter 0.257 ms | 1.14x faster |
+| HITS hubs and authorities, L2 normalized | 7.704 ms | petgraph equal-equation adapter 7.950 ms | 1.03x faster |
+
+The direct BCC competitor uses recursive Hopcroft-Tarjan traversal and
+overflowed the Windows stack on the 10,000 / 30,000 benchmark input. The
+Weavatrix traversal is iterative; its regression suite includes a 200,000-node
+chain. Its raw node-block-only lower bound is 0.157 ms, but adding original
+edge blocks and articulation points raises it to 0.257 ms. The table compares
+that equal output instead of presenting the narrower operation as equivalent.
+
+Petgraph does not expose HITS directly, so that row uses an equal-equation
+adapter over its graph storage, including endpoint deduplication, L2
+normalization, convergence checks, and the same cap. Seeded dense-matrix
+references check both score vectors.
+
+### Keyed and stable undirected mutation
+
+The keyed build uses 10,000 domain keys / 30,000 directed edges. Stable
+undirected construction uses the same size; the churn row removes and reinserts
+1,000 edges with cloning/setup outside the timed interval:
+
+| Contract | weavatrix-graph | petgraph | Result |
+| --- | ---: | ---: | --- |
+| Keyed directed build | 0.650 ms | `GraphMap` 3.788 ms | 5.83x faster |
+| Stable undirected build | 0.557 ms | `StableUnGraph` 0.230 ms | petgraph 2.42x faster |
+| Stable undirected 1,000 remove + 1,000 insert | 0.169 ms | `StableUnGraph` 0.018 ms | petgraph 9.39x faster |
+
+The keyed row is conservative for Weavatrix: it also stores independent node
+payloads and returns generation-stable handles. The stable rows document a
+deliberate safety cost rather than hiding it: Weavatrix detects stale node and
+edge keys after slot reuse, while petgraph stable indexes can alias a reused
+slot. Both Weavatrix operations use intrusive incidence and perform no
+per-node heap allocation.
+
+### Distance analytics and chain decomposition
+
+Distance analytics use 1,500 nodes / 4,500 connected undirected edges. Chain
+decomposition uses 20,000 nodes / 60,000 simple undirected edges. Values are the
+median of five independent harness medians; every harness performs two warmups
+and 11 measured runs:
+
+| Equal output contract | weavatrix-graph | Reference | Result |
+| --- | ---: | ---: | --- |
+| Eccentricity, radius, diameter, center, and periphery | 30.890 ms | petgraph equal-output adapter 61.343 ms | 1.99x faster |
+| Chain decomposition | 5.958 ms | `rustworkx-core 0.18.0` 10.797 ms | 1.81x faster |
+
+The distance fast path builds compact neighbor CSR once, then reuses
+epoch-stamped BFS storage for every source. The petgraph adapter computes the
+same five outputs, reuses its queue and distance vector, and rejects
+disconnected graphs under the same contract.
+
+The chain row calls rustworkx-core directly and compares the exact non-bridge
+endpoint set and chain count. Weavatrix additionally returns original edge IDs
+and has defined behavior for parallel edges and self-loops; rustworkx documents
+those inputs as unsupported. Seeded differential tests cover simple graphs, an
+independent edge-removal reference checks exact non-bridge coverage, and a
+200,000-node chain protects the iterative stack-safety contract.
+
+### Edge betweenness and global min-cut
+
+Edge betweenness uses 1,200 nodes / 4,800 simple undirected edges and returns a
+normalized score for every original edge. Stoer-Wagner uses 350 nodes / 1,400
+weighted edges. Values are the median of five independent harness medians;
+every harness performs two warmups and 11 measured runs:
+
+| Equal output contract | weavatrix-graph | `rustworkx-core 0.18.0` | Result |
+| --- | ---: | ---: | --- |
+| Edge betweenness, sequential | 71.367 ms | 262.602 ms | 3.68x faster |
+| Edge betweenness, Rayon | 14.985 ms | 294.388 ms | 19.64x faster |
+| Stoer-Wagner global min-cut | 22.644 ms | 24.012 ms | 1.06x faster |
+
+Both edge-centrality rows call the rustworkx implementation directly and assert
+every edge score before timing. The Weavatrix implementation keeps
+source-local score vectors in the Rayon path and reduces them after traversal;
+it also preserves parallel-edge identities, gives self-loops a defined zero
+score, and evaluates semantic filters once per edge.
+
+The min-cut row asserts the same minimum weight. Weavatrix additionally checks
+negative/non-finite weights and arithmetic overflow, aggregates parallel edges,
+and returns both sides in deterministic canonical order; rustworkx returns one
+partition side and uses unchecked weight addition. Reproduce these rows with:
+
+```sh
+cargo bench --locked --all-features --bench edge_cut_analysis
+```
+
+### P1 matching, coloring, feedback, and Steiner
+
+The workloads use 400 nodes / 1,400 edges for general matching, 180 / 500 for
+maximal cliques, 5,000 / 15,000 for DSATUR, 10,000 / 30,000 directed edges for
+feedback arc set, and 1,000 / 4,000 with 32 terminals for Steiner tree:
+
+| Equal output contract | weavatrix-graph | petgraph | Result and quality |
+| --- | ---: | ---: | --- |
+| Exact maximum matching, materialized pairs | 0.097 ms | 0.124 ms | 1.28x faster; 200 pairs |
+| All maximal cliques | 0.164 ms | 0.368 ms | 2.24x faster; 500 cliques |
+| DSATUR coloring | 3.299 ms | 3.550 ms | 1.08x faster; 5 colors |
+| Eades feedback arc set | 2.375 ms | 3.431 ms | 1.44x faster; 8,216 edges |
+| Multi-start metric-closure Steiner tree | 5.596 ms | 965.055 ms | 172.45x faster; cost 340 vs median 344 |
+
+The matching adapter consumes `petgraph::Matching::edges()` into endpoint pairs
+instead of timing its lazy result. Feedback returns the same set cardinality on
+the benchmark and no more edges across 24 seeded differential cases. DSATUR
+uses the same color count across those cases. The deterministic multi-start
+Steiner result is no more expensive across 20 seeded comparisons and preserves
+the standard metric-closure two-approximation candidate; the brute-force tests
+also verify the bound directly on small graphs. Petgraph's Steiner cost varied
+from 340 to 344 across the five benchmark processes, while the
+weavatrix-graph result remained 340.
+
+### P2 bit matrix and optional parallel batches
+
+The bit-matrix workload performs one million deterministic adjacency lookups
+over 10,000 nodes / 30,000 edges. The batch workloads run 128 BFS traversals and
+64 weighted Dijkstra queries over the same dual-CSR topology. Values are the
+median of five independent harness medians:
+
+| Equal output contract | Sequential / competitor | P2 implementation | Result |
+| --- | ---: | ---: | --- |
+| Safe bit-matrix lookup | petgraph `FixedBitSet` 5.284 ms | `BitMatrix::contains` 5.396 ms | within 2.1% |
+| Checked opt-in fast lookup | petgraph `FixedBitSet` 5.284 ms | `contains_fast` 4.804 ms | 1.10x faster |
+| Caller-validated lookup | petgraph `FixedBitSet` 5.284 ms | `contains_unchecked` 3.382 ms | 1.56x faster |
+| 128 BFS traversals | sequential 33.258 ms | Rayon 6.609 ms | 5.03x faster |
+| 64 Dijkstra queries | sequential 39.771 ms | Rayon 8.699 ms | 4.57x faster |
+| Johnson APSP, 1,200 / 6,000 | sequential 217.512 ms | Rayon 64.038 ms | 3.40x faster |
+| Closeness, 1,000 / 4,000 | sequential 21.041 ms | Rayon 4.818 ms | 4.37x faster |
+| Betweenness, 1,000 / 4,000 | sequential 139.065 ms | Rayon 25.033 ms | 5.56x faster |
+
+`BitMatrix` uses exactly 12,500,000 payload bytes for the 10,000-square matrix
+in every mode. The default path is fully safe and essentially at parity.
+The checked opt-in path beats petgraph while retaining a safe public contract;
+the caller-validated path is fastest. Unsafe code is feature-gated, isolated,
+and rejected everywhere else by an architecture test. Rayon is not enabled by
+default and has no effect on single-query algorithms or `no_std` builds.
+
+### Lazy traversal, generic costs, and stable mutation
+
+The traversal graph has 50,000 nodes and 150,000 weighted edges. Lazy BFS stops
+after 128 settlements, generic Dijkstra uses `f64`, and the mutation workload
+builds the same graph before removing and replacing 100 nodes. Values are the
+median of five independent harness medians:
+
+| Equal output contract | weavatrix-graph | petgraph | Result |
+| --- | ---: | ---: | --- |
+| Lazy BFS, first 128 nodes | 0.002 ms | 0.003 ms | 1.50x faster |
+| Generic `f64` Dijkstra to target | 8.342 ms | 11.936 ms | 1.43x faster |
+| Stable build/remove/reinsert | 2.247 ms | 2.227 ms | within 0.9% |
+
+The mutable row is conservative: `StablePayloadGraph` also detects stale keys
+after slot reuse through a generation counter. Its adjacency is an intrusive
+slot list, so construction performs no per-node adjacency allocations. Filtered
+views are genuinely lazy: creating an adjacency iterator does not evaluate its
+predicate, and early stopping evaluates only the consumed prefix.
 
 ### Filtered components and condensation
 
@@ -338,8 +760,9 @@ Extractors that already emit sorted nodes can use
 deduplication, and both indexes. Unordered input safely falls back to the
 canonicalizing constructor.
 
-`petgraph` and `graaf` are dev-dependencies only. The runtime dependency budget
-remains unchanged.
+`petgraph`, `graaf`, and `rustworkx-core` are dev-dependencies only. The default
+runtime dependency budget remains `serde`; Rayon and its transitive dependencies
+appear only when the `rayon` feature is explicitly selected.
 
 Timing varies by allocator, CPU, and build toolchain. Run the included harnesses
 on the deployment target before using these figures for capacity planning.
@@ -350,11 +773,13 @@ Local checks:
 
 ```sh
 cargo fmt --check
-cargo test --locked
-cargo clippy --locked --all-targets -- -D warnings
-cargo doc --locked --no-deps
+cargo test --all-features --locked
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo check --no-default-features --target thumbv7em-none-eabihf --lib --locked
+cargo check --no-default-features --features unsafe-fast --target thumbv7em-none-eabihf --lib --locked
+cargo doc --locked --no-deps --all-features
 cargo llvm-cov --workspace --all-features --fail-under-lines 85
-cargo bench --locked
+cargo bench --all-features --locked
 ```
 
 The test suite includes architecture and duplicate-contract ratchets: every Rust
@@ -362,9 +787,12 @@ source stays at or below 300 lines, domain facades remain small, runtime
 dependencies remain limited, and canonical kind strings cannot collide.
 
 CI also runs measured Rust coverage with `cargo-llvm-cov`, emits `lcov.info`
-for analyzer import, and fails below 85% line coverage. Weavatrix architecture
+for analyzer import, and fails below 85% line coverage. It additionally runs
+Linux `proptest` contracts, Miri over traversal/view/analytics/mutable storage,
+and bounded libFuzzer smoke targets for topology, matrices, mutation, and
+interchange formats. Weavatrix architecture
 verification is backed by `.weavatrix/architecture.json`. The current local
-LLVM report measures 93.59% of lines and 91.04% of functions.
+MSVC LLVM report measures 92.28% of lines and 88.81% of functions.
 
 ## License
 

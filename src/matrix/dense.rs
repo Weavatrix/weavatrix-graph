@@ -1,3 +1,4 @@
+use crate::Vec;
 use crate::{GraphError, NodeIndex, Result};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 
@@ -27,7 +28,7 @@ impl<T> DenseMatrix<T> {
         Ok(Self {
             node_count: compact,
             edge_count: 0,
-            cells: std::iter::repeat_with(|| None).take(cells).collect(),
+            cells: core::iter::repeat_with(|| None).take(cells).collect(),
         })
     }
 
@@ -158,7 +159,7 @@ impl<'de, T> Deserialize<'de> for DenseMatrix<T>
 where
     T: Deserialize<'de>,
 {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

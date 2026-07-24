@@ -1,5 +1,5 @@
 use crate::EdgeEndpoints;
-use std::hash::Hash;
+use core::hash::Hash;
 
 pub trait UndirectedGraphView {
     type Node: Copy + Eq + Hash;
@@ -44,4 +44,8 @@ pub trait IndexUndirectedGraphView: UndirectedGraphView {
     fn node_slot(node: Self::Node) -> usize;
 
     fn edge_slot(edge: Self::Edge) -> usize;
+
+    fn incident_edge_at(&self, node: Self::Node, offset: usize) -> Option<Self::Edge> {
+        self.incident_edges(node).nth(offset)
+    }
 }

@@ -1,4 +1,5 @@
 use super::{IndexUndirectedGraphView, UndirectedGraphView};
+use crate::Vec;
 use crate::topology::csr::Csr;
 use crate::{EdgeEndpoints, EdgeIndex, GraphError, NodeIndex, Result};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
@@ -72,6 +73,11 @@ impl UndirectedTopology {
         node: NodeIndex,
     ) -> impl DoubleEndedIterator<Item = EdgeIndex> + ExactSizeIterator + '_ {
         self.incidence.get(node.index()).iter().copied()
+    }
+
+    #[must_use]
+    pub fn incident_edge_at(&self, node: NodeIndex, offset: usize) -> Option<EdgeIndex> {
+        self.incidence.get(node.index()).get(offset).copied()
     }
 
     #[must_use]
@@ -159,6 +165,10 @@ impl IndexUndirectedGraphView for UndirectedTopology {
     fn edge_slot(edge: EdgeIndex) -> usize {
         edge.index()
     }
+
+    fn incident_edge_at(&self, node: NodeIndex, offset: usize) -> Option<EdgeIndex> {
+        self.incident_edge_at(node, offset)
+    }
 }
 
 #[derive(Deserialize)]
@@ -168,7 +178,7 @@ struct UndirectedWire {
 }
 
 impl<'de> Deserialize<'de> for UndirectedTopology {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

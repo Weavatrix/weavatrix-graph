@@ -1,7 +1,8 @@
 use super::{NodeId, Provenance, SourceSpan};
+use crate::String;
 use crate::{AttributeValue, EdgeKind, NodeKind, Result};
+use alloc::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Node {

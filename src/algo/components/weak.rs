@@ -1,4 +1,5 @@
 use crate::IndexGraphView;
+use crate::Vec;
 
 #[must_use]
 pub fn weakly_connected_components<G>(graph: &G) -> Vec<Vec<G::Node>>
@@ -91,7 +92,7 @@ impl DisjointSet {
             return;
         }
         if self.rank[left] < self.rank[right] {
-            std::mem::swap(&mut left, &mut right);
+            core::mem::swap(&mut left, &mut right);
         }
         self.parent[right] = left;
         if self.rank[left] == self.rank[right] {

@@ -1,4 +1,5 @@
 use super::{EdgeEndpoints, EdgeIndex};
+use crate::Vec;
 use crate::{GraphError, Result};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

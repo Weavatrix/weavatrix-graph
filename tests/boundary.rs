@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[test]
-fn library_has_no_process_network_filesystem_or_unsafe_path() {
+fn library_has_no_process_network_or_unscoped_unsafe_path() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let mut sources = Vec::new();
     collect_rust_sources(&root.join("src"), &mut sources);
@@ -10,7 +10,6 @@ fn library_has_no_process_network_filesystem_or_unsafe_path() {
         "std::process",
         "std::net",
         "std::fs",
-        "unsafe {",
         "reqwest",
         "tokio",
         "tree_sitter",
@@ -25,11 +24,19 @@ fn library_has_no_process_network_filesystem_or_unsafe_path() {
                 path.display()
             );
         }
+        let is_unsafe_fast = path.ends_with(Path::new("matrix/bit/unsafe_fast.rs"));
+        if !is_unsafe_fast {
+            assert!(
+                !source.contains("unsafe {") && !source.contains("unsafe fn"),
+                "{} contains unsafe code outside the opt-in matrix module",
+                path.display()
+            );
+        }
     }
 }
 
 #[test]
-fn runtime_dependency_budget_contains_only_serde() {
+fn runtime_dependencies_are_serde_plus_optional_rayon() {
     let manifest =
         fs::read_to_string(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")).unwrap();
     let dependencies = manifest
@@ -44,8 +51,18 @@ fn runtime_dependency_budget_contains_only_serde() {
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .collect::<Vec<_>>();
-    assert_eq!(entries.len(), 1);
-    assert!(entries[0].starts_with("serde ="));
+    assert_eq!(entries.len(), 2);
+    assert!(entries.iter().any(|line| {
+        line.starts_with("serde =")
+            && line.contains("default-features = false")
+            && line.contains("\"alloc\"")
+    }));
+    assert!(
+        entries
+            .iter()
+            .any(|line| line.starts_with("rayon =") && line.contains("optional = true"))
+    );
+    assert!(manifest.contains("unsafe-fast = []"));
 }
 
 fn collect_rust_sources(directory: &Path, output: &mut Vec<PathBuf>) {

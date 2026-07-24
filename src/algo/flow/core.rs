@@ -1,6 +1,7 @@
 use super::cut::{indexed_nodes, residual_reachable};
+use crate::Vec;
 use crate::{GraphError, IndexGraphView, Result};
-use std::collections::VecDeque;
+use alloc::collections::VecDeque;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaxFlow<Node, Edge> {
@@ -10,6 +11,18 @@ pub struct MaxFlow<Node, Edge> {
 }
 
 impl<Node, Edge> MaxFlow<Node, Edge> {
+    pub(super) fn from_parts(
+        value: u64,
+        edge_flows: Vec<(Edge, u64)>,
+        source_side: Vec<Node>,
+    ) -> Self {
+        Self {
+            value,
+            edge_flows,
+            source_side,
+        }
+    }
+
     #[must_use]
     pub const fn value(&self) -> u64 {
         self.value

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use weavatrix_graph::{
     Confidence, Edge, EdgeKind, EvidenceKind, Graph, Node, NodeId, NodeKind, Provenance,
@@ -120,4 +121,18 @@ pub fn topology_pairs(node_count: usize, edge_count: usize) -> Vec<(usize, usize
             (source, target)
         })
         .collect()
+}
+
+pub fn undirected_pairs(node_count: usize, edge_count: usize) -> Vec<(usize, usize)> {
+    let mut pairs = BTreeSet::new();
+    for source in 0..node_count - 1 {
+        pairs.insert((source, source + 1));
+    }
+    for (source, target) in topology_pairs(node_count, edge_count * 4) {
+        pairs.insert((source.min(target), source.max(target)));
+        if pairs.len() == edge_count {
+            break;
+        }
+    }
+    pairs.into_iter().collect()
 }

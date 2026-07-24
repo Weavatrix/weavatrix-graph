@@ -1,16 +1,19 @@
+use super::measure::Measure;
 use super::traversal::{Direction, for_each_adjacent};
-use crate::IndexGraphView;
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use super::walk::{DijkstraWorkspace, dijkstra_iter_filtered};
+use crate::Vec;
+use crate::{IndexGraphView, Result};
+use alloc::collections::BinaryHeap;
+use core::cmp::Reverse;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WeightedPath<Node> {
+pub struct WeightedPath<Node, Cost = u64> {
     nodes: Vec<Node>,
-    total_cost: u64,
+    total_cost: Cost,
 }
 
-impl<Node> WeightedPath<Node> {
-    pub(super) fn from_parts(nodes: Vec<Node>, total_cost: u64) -> Self {
+impl<Node, Cost> WeightedPath<Node, Cost> {
+    pub(super) fn from_parts(nodes: Vec<Node>, total_cost: Cost) -> Self {
         Self { nodes, total_cost }
     }
 
@@ -20,7 +23,10 @@ impl<Node> WeightedPath<Node> {
     }
 
     #[must_use]
-    pub const fn total_cost(&self) -> u64 {
+    pub const fn total_cost(&self) -> Cost
+    where
+        Cost: Copy,
+    {
         self.total_cost
     }
 
@@ -28,6 +34,67 @@ impl<Node> WeightedPath<Node> {
     pub fn into_nodes(self) -> Vec<Node> {
         self.nodes
     }
+}
+
+/// Computes a shortest path with an arbitrary checked measure.
+///
+/// # Errors
+///
+/// Returns an error for negative, non-finite, or overflowing path costs.
+pub fn dijkstra_measure<G, Cost, F>(
+    graph: &G,
+    source: G::Node,
+    target: G::Node,
+    mut edge_cost: F,
+) -> Result<Option<WeightedPath<G::Node, Cost>>>
+where
+    G: IndexGraphView,
+    Cost: Measure,
+    F: FnMut(G::Edge) -> Cost,
+{
+    dijkstra_measure_filtered(graph, source, target, Direction::Outgoing, |edge| {
+        Some(edge_cost(edge))
+    })
+}
+
+/// Computes a filtered shortest path with an arbitrary checked measure.
+///
+/// # Errors
+///
+/// Returns an error for negative, non-finite, or overflowing path costs.
+pub fn dijkstra_measure_filtered<G, Cost, F>(
+    graph: &G,
+    source: G::Node,
+    target: G::Node,
+    direction: Direction,
+    edge_cost: F,
+) -> Result<Option<WeightedPath<G::Node, Cost>>>
+where
+    G: IndexGraphView,
+    Cost: Measure,
+    F: FnMut(G::Edge) -> Option<Cost>,
+{
+    if !graph.contains_node(source) || !graph.contains_node(target) {
+        return Ok(None);
+    }
+    let mut workspace = DijkstraWorkspace::new();
+    let mut target_cost = None;
+    {
+        let search = dijkstra_iter_filtered(graph, source, direction, &mut workspace, edge_cost);
+        for settled in search {
+            let (node, cost) = settled?;
+            if node == target {
+                target_cost = Some(cost);
+                break;
+            }
+        }
+    }
+    let Some(total_cost) = target_cost else {
+        return Ok(None);
+    };
+    Ok(workspace
+        .path_to::<G>(source, target)
+        .map(|nodes| WeightedPath::from_parts(nodes, total_cost)))
 }
 
 pub fn dijkstra<G, F>(

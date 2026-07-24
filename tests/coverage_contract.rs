@@ -134,6 +134,10 @@ fn graph_error_display_messages_cover_every_variant() {
         GraphError::NegativeCycle {
             algorithm: "Bellman-Ford",
         },
+        GraphError::CyclicGraph {
+            algorithm: "DAG longest path",
+        },
+        GraphError::MissingKeyedNode { endpoint: "source" },
     ];
 
     let messages = errors
@@ -155,6 +159,8 @@ fn graph_error_display_messages_cover_every_variant() {
     assert!(messages.contains("probability 2/1"));
     assert!(messages.contains("invalid damping for PageRank"));
     assert!(messages.contains("reachable negative cycle"));
+    assert!(messages.contains("requires an acyclic graph"));
+    assert!(messages.contains("keyed graph source node does not exist"));
     assert!(GraphError::EmptyNodeId.source().is_none());
 }
 

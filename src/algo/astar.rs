@@ -1,8 +1,8 @@
 use super::shortest::{WeightedPath, reconstruct};
 use super::traversal::{Direction, for_each_adjacent};
 use crate::IndexGraphView;
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use alloc::collections::BinaryHeap;
+use core::cmp::Reverse;
 
 pub fn astar<G, F, H>(
     graph: &G,

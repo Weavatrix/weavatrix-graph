@@ -1,4 +1,5 @@
 /target/
+/fuzz/target/
 /coverage/
 /lcov.info
 /tarpaulin-report.json

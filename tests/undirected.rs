@@ -3,7 +3,7 @@ use petgraph::data::Element;
 use petgraph::graph::UnGraph;
 use weavatrix_graph::{
     EdgeEndpoints, EdgeIndex, IndexUndirectedGraphView, NodeIndex, UndirectedTopology,
-    minimum_spanning_forest,
+    minimum_spanning_forest, prim_spanning_forest,
 };
 
 fn endpoints(source: u32, target: u32) -> EdgeEndpoints {
@@ -124,6 +124,19 @@ fn compare_mst(node_count: usize, pairs: &[(usize, usize)], weights: &[u64]) {
     )
     .unwrap();
     let ours = minimum_spanning_forest(&ours, |edge| weights[edge.index()]);
+    let prim = prim_spanning_forest(
+        &UndirectedTopology::try_from_edges(
+            node_count,
+            pairs.iter().map(|&(source, target)| {
+                endpoints(
+                    u32::try_from(source).unwrap(),
+                    u32::try_from(target).unwrap(),
+                )
+            }),
+        )
+        .unwrap(),
+        |edge| weights[edge.index()],
+    );
     let ours_weight = ours.total_weight();
     let ours_edges = ours.clone().into_edges();
     assert_eq!(
@@ -145,4 +158,6 @@ fn compare_mst(node_count: usize, pairs: &[(usize, usize)], weights: &[u64]) {
         })
         .sum::<u64>();
     assert_eq!(ours_weight, u128::from(expected));
+    assert_eq!(prim.total_weight(), ours_weight);
+    assert_eq!(prim.component_count(), ours.component_count());
 }

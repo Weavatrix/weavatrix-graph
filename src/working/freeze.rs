@@ -1,11 +1,25 @@
 use super::{StableEdgeKey, StableNodeKey, WorkingGraph};
+use crate::Vec;
 use crate::{EdgeIndex, Graph, NodeIndex, Result};
-use std::collections::HashMap;
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as StableMap;
+#[cfg(feature = "std")]
+use std::collections::HashMap as StableMap;
+
+#[cfg(feature = "std")]
+fn stable_map_with_capacity<K, V>(capacity: usize) -> StableMap<K, V> {
+    StableMap::with_capacity(capacity)
+}
+
+#[cfg(not(feature = "std"))]
+fn stable_map_with_capacity<K: Ord, V>(_: usize) -> StableMap<K, V> {
+    StableMap::new()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FreezeMap {
-    nodes: HashMap<StableNodeKey, NodeIndex>,
-    edges: HashMap<StableEdgeKey, EdgeIndex>,
+    nodes: StableMap<StableNodeKey, NodeIndex>,
+    edges: StableMap<StableEdgeKey, EdgeIndex>,
 }
 
 impl FreezeMap {
@@ -63,7 +77,7 @@ impl WorkingGraph {
             .collect::<Vec<_>>();
         keyed_nodes.sort_unstable_by(|left, right| left.1.id.cmp(&right.1.id));
 
-        let mut node_map = HashMap::with_capacity(keyed_nodes.len());
+        let mut node_map = stable_map_with_capacity(keyed_nodes.len());
         let mut nodes = Vec::with_capacity(keyed_nodes.len());
         for (index, (key, node)) in keyed_nodes.into_iter().enumerate() {
             let index =
@@ -88,7 +102,7 @@ impl WorkingGraph {
             .collect::<Vec<_>>();
         keyed_edges.sort_unstable_by(|left, right| left.1.cmp(&right.1));
 
-        let mut edge_map = HashMap::with_capacity(keyed_edges.len());
+        let mut edge_map = stable_map_with_capacity(keyed_edges.len());
         let mut edges = Vec::with_capacity(keyed_edges.len());
         for (key, edge) in keyed_edges {
             let index = if edges.last() == Some(&edge) {

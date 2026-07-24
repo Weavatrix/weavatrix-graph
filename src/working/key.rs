@@ -27,7 +27,7 @@ macro_rules! stable_key {
 
             #[must_use]
             pub const fn index(self) -> usize {
-                self.slot as usize
+                self.slot() as usize
             }
         }
     };

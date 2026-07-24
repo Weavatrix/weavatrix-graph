@@ -1,5 +1,7 @@
+use super::walk::{TraversalWorkspace, bfs_iter_filtered, dfs_iter_filtered};
 use crate::IndexGraphView;
-use std::collections::VecDeque;
+use crate::Vec;
+use alloc::collections::VecDeque;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Direction {
@@ -14,7 +16,30 @@ pub fn bfs<G>(graph: &G, start: G::Node) -> Vec<G::Node>
 where
     G: IndexGraphView,
 {
-    bfs_filtered(graph, start, Direction::Outgoing, |_| true)
+    if !graph.contains_node(start) {
+        return Vec::new();
+    }
+    let mut seen = vec![false; graph.node_bound()];
+    let mut visited = Vec::with_capacity(graph.node_count());
+    seen[G::node_slot(start)] = true;
+    visited.push(start);
+    let mut cursor = 0;
+    while cursor < visited.len() {
+        let node = visited[cursor];
+        cursor += 1;
+        for edge in graph.outgoing_edges(node) {
+            let Some(endpoints) = graph.edge_endpoints(edge) else {
+                continue;
+            };
+            let neighbor = endpoints.target();
+            let slot = G::node_slot(neighbor);
+            if !seen[slot] {
+                seen[slot] = true;
+                visited.push(neighbor);
+            }
+        }
+    }
+    visited
 }
 
 #[must_use]
@@ -22,31 +47,14 @@ pub fn bfs_filtered<G, F>(
     graph: &G,
     start: G::Node,
     direction: Direction,
-    mut keep_edge: F,
+    keep_edge: F,
 ) -> Vec<G::Node>
 where
     G: IndexGraphView,
     F: FnMut(G::Edge) -> bool,
 {
-    if !graph.contains_node(start) {
-        return Vec::new();
-    }
-    let mut seen = vec![false; graph.node_bound()];
-    let mut queue = VecDeque::with_capacity(graph.node_count());
-    let mut order = Vec::with_capacity(graph.node_count());
-    seen[G::node_slot(start)] = true;
-    queue.push_back(start);
-    while let Some(node) = queue.pop_front() {
-        order.push(node);
-        for_each_neighbor(graph, node, direction, &mut keep_edge, |neighbor| {
-            let slot = G::node_slot(neighbor);
-            if !seen[slot] {
-                seen[slot] = true;
-                queue.push_back(neighbor);
-            }
-        });
-    }
-    order
+    let mut workspace = TraversalWorkspace::new();
+    bfs_iter_filtered(graph, start, direction, &mut workspace, keep_edge).collect()
 }
 
 #[must_use]
@@ -62,35 +70,14 @@ pub fn dfs_filtered<G, F>(
     graph: &G,
     start: G::Node,
     direction: Direction,
-    mut keep_edge: F,
+    keep_edge: F,
 ) -> Vec<G::Node>
 where
     G: IndexGraphView,
     F: FnMut(G::Edge) -> bool,
 {
-    if !graph.contains_node(start) {
-        return Vec::new();
-    }
-    let mut seen = vec![false; graph.node_bound()];
-    let mut stack = Vec::with_capacity(graph.node_count());
-    let mut order = Vec::with_capacity(graph.node_count());
-    stack.push(start);
-    while let Some(node) = stack.pop() {
-        let slot = G::node_slot(node);
-        if seen[slot] {
-            continue;
-        }
-        seen[slot] = true;
-        order.push(node);
-        let mut neighbors = Vec::new();
-        for_each_neighbor(graph, node, direction, &mut keep_edge, |neighbor| {
-            if !seen[G::node_slot(neighbor)] {
-                neighbors.push(neighbor);
-            }
-        });
-        stack.extend(neighbors.into_iter().rev());
-    }
-    order
+    let mut workspace = TraversalWorkspace::new();
+    dfs_iter_filtered(graph, start, direction, &mut workspace, keep_edge).collect()
 }
 
 #[must_use]

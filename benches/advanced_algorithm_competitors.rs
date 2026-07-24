@@ -1,3 +1,5 @@
+#[path = "advanced_algorithm_competitors/dag_intelligence.rs"]
+mod dag_intelligence;
 mod support;
 
 use petgraph::algo::{
@@ -21,6 +23,7 @@ fn main() {
     compare_bellman_ford();
     compare_page_rank();
     compare_dominators();
+    dag_intelligence::compare();
     compare_transitive();
 }
 

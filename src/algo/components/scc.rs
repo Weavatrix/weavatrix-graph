@@ -1,3 +1,4 @@
+use crate::Vec;
 use crate::{EdgeEndpoints, IndexGraphView};
 
 #[must_use]
@@ -83,7 +84,7 @@ fn finish_from<G, F>(
         }
         seen[slot] = true;
         stack.push((node, true));
-        for edge in graph.outgoing_edges(node).rev() {
+        for edge in graph.outgoing_edges(node) {
             if !allows_edge(edge) {
                 continue;
             }

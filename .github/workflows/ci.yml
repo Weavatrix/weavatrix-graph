@@ -14,11 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Install stable Rust
-        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt
+        run: |
+          rustup toolchain install stable --profile minimal --component clippy,rustfmt
+          rustup target add thumbv7em-none-eabihf --toolchain stable
       - name: Check formatting
         run: cargo +stable fmt --all -- --check
       - name: Run Clippy
         run: cargo +stable clippy --all-targets --all-features -- -D warnings
+      - name: Check no_std plus alloc
+        run: |
+          cargo +stable check --no-default-features --target thumbv7em-none-eabihf --lib --locked
+          cargo +stable check --no-default-features --features unsafe-fast --target thumbv7em-none-eabihf --lib --locked
       - name: Run tests
         run: cargo +stable test --all-features --locked
       - name: Build documentation
@@ -53,3 +59,35 @@ jobs:
           cargo install cargo-llvm-cov --locked
       - name: Check test coverage
         run: cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info --fail-under-lines 85
+
+  miri:
+    name: Miri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nightly Miri
+        run: |
+          rustup toolchain install nightly --profile minimal --component miri
+          cargo +nightly miri setup
+      - name: Check memory and unsafe contracts
+        run: |
+          cargo +nightly miri test --test lazy_traversal
+          cargo +nightly miri test --test generic_dijkstra
+          cargo +nightly miri test --test views_operators
+          cargo +nightly miri test --test network_analytics
+          cargo +nightly miri test --test stable_payload
+          cargo +nightly miri test --test keyed_stable_undirected
+
+  fuzz-smoke:
+    name: Fuzz smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install nightly Rust and cargo-fuzz
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-fuzz --locked
+      - name: Fuzz topology and format boundaries
+        run: |
+          cargo +nightly fuzz run topology -- -runs=10000
+          cargo +nightly fuzz run formats -- -runs=10000

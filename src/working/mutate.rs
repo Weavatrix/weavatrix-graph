@@ -1,4 +1,5 @@
 use super::{StableEdgeKey, StableNodeKey, WorkingGraph};
+use crate::ToString;
 use crate::graph::validate::{validate_edge, validate_node};
 use crate::{Edge, GraphError, Node, Result};
 
@@ -127,7 +128,7 @@ impl WorkingGraph {
         };
         working.source = source;
         working.target = target;
-        Ok(Some(std::mem::replace(&mut working.value, edge)))
+        Ok(Some(core::mem::replace(&mut working.value, edge)))
     }
 
     fn retire_node_slot(&mut self, key: StableNodeKey) {

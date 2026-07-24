@@ -1,3 +1,4 @@
+use crate::Vec;
 use crate::{EdgeEndpoints, GraphError, NodeIndex, Result, Topology, UndirectedTopology};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +58,25 @@ impl RandomGraphGenerator {
             }
         }
         UndirectedTopology::try_from_edges(node_count, edges)
+    }
+
+    /// Generates a DAG with edges from lower to higher node ids.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid probability or compact capacity overflow.
+    pub fn dag(&mut self, node_count: usize, numerator: u64, denominator: u64) -> Result<Topology> {
+        validate_probability(numerator, denominator)?;
+        validate_node_count(node_count)?;
+        let mut edges = Vec::new();
+        for source in 0..node_count {
+            for target in (source + 1)..node_count {
+                if self.sample(numerator, denominator) {
+                    edges.push(endpoints(source, target)?);
+                }
+            }
+        }
+        Topology::try_from_edges(node_count, edges)
     }
 
     fn sample(&mut self, numerator: u64, denominator: u64) -> bool {

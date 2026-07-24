@@ -1,6 +1,7 @@
+use crate::{String, Vec};
+use alloc::collections::BTreeMap;
+use core::hash::{Hash, Hasher};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
-use std::collections::BTreeMap;
-use std::hash::{Hash, Hasher};
 
 /// Deterministic JSON-like attribute value for graph extensions.
 ///
@@ -38,13 +39,13 @@ impl PartialEq for FiniteF64 {
 impl Eq for FiniteF64 {}
 
 impl PartialOrd for FiniteF64 {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl Ord for FiniteF64 {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.0.total_cmp(&other.0)
     }
 }
@@ -56,7 +57,7 @@ impl Hash for FiniteF64 {
 }
 
 impl<'de> Deserialize<'de> for FiniteF64 {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -125,7 +126,7 @@ impl From<String> for AttributeValue {
 
 impl From<&str> for AttributeValue {
     fn from(value: &str) -> Self {
-        Self::String(value.to_owned())
+        Self::String(String::from(value))
     }
 }
 

@@ -2,6 +2,92 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+## 0.5.0 - 2026-07-24
+
+- Add `KeyedPayloadGraph` for GraphMap-style domain lookup backed by
+  generation-stable handles under both `std` and `no_std`.
+- Add `StableUndirectedPayloadGraph` with intrusive double-ended incidence,
+  parallel-edge/self-loop semantics, stable retargeting and removal, direct
+  algorithm views, and immutable compaction.
+- Specialize eager BFS storage, accelerate sorted rich-edge indexing, and add
+  equal-contract keyed/stable competitor benchmarks plus the 200,000-node /
+  1,000,000-edge regression.
+- Remove BCC per-block sorting and optional discovery states, add an
+  equal-output competitor adapter, and specialize dense HITS convergence; the
+  measured equal-output implementations are now 1.14x and 1.03x faster.
+- Add directed and undirected Brandes edge betweenness with normalized/raw,
+  filtered, multigraph-safe, self-loop-defined, and Rayon variants using
+  allocation-reusing per-source workspaces.
+- Add generic checked Stoer-Wagner global min-cut with deterministic two-sided
+  partitions, parallel-edge aggregation, semantic filtering, and finite
+  non-negative `Measure` weights.
+- Add exact examples, seeded rustworkx differential tests, exhaustive
+  brute-force min-cut coverage, and equal-output competitor benchmarks; the
+  measured sequential/parallel edge-centrality paths are 3.68x/19.64x faster
+  and min-cut is 1.06x faster.
+- Add exact connected-graph eccentricity, radius, diameter, center, and
+  periphery analytics with canonical output, single-pass semantic filtering,
+  reusable BFS storage, and a compact neighbor-CSR fast path.
+- Add iterative deterministic chain decomposition with original edge IDs,
+  component-rooted and filtered variants, plus defined parallel-edge and
+  self-loop behavior.
+- Add exhaustive and seeded references, rustworkx differential coverage, a
+  200,000-node stack-safety regression, and equal-output distance/chain
+  benchmarks; the measured implementations are 1.99x and 1.81x faster,
+  respectively.
+- Add iterative vertex-biconnected edge components with canonical ordering,
+  articulation points, parallel-edge/self-loop handling, semantic filtering,
+  exhaustive references, and a 200,000-node stack-safety regression.
+- Add deterministic L2-normalized HITS hub and authority centrality with
+  single-pass edge filtering and provenance-neutral endpoint deduplication.
+- Add equal-result BCC and HITS benchmark adapters, documenting both the
+  recursive competitor's stack overflow and the remaining small-graph
+  throughput gaps.
+- Add deterministic weighted and unweighted DAG longest paths, topological
+  generations, and dominance frontiers with semantic edge filtering.
+- Add seeded differential references and equal-output competitor benchmarks for
+  DAG intelligence; replace an initial O(E * V) frontier reachability check
+  exposed by the benchmark with slot-indexed O(V + E) preparation.
+- Add lazy BFS, DFS, and generic Dijkstra settlement iterators with reusable
+  workspaces, early stopping, and callback-controlled DFS events.
+- Generalize shortest-path costs through checked integer and finite
+  floating-point `Measure` implementations.
+- Add lazy reversed, edge-filtered, and induced-subgraph views without
+  predicate pre-scans, plus complement and union operators.
+- Add degree, closeness, betweenness, Katz, and eigenvector centrality, k-core,
+  cycle basis, and deterministic label-propagation communities.
+- Add Edmonds-Karp, push-relabel, min-cost max-flow, Prim, parallel Johnson
+  APSP, and parallel centrality.
+- Add `StablePayloadGraph` with compact intrusive adjacency, generation-checked
+  keys, payload mapping, immutable compaction, and `AcyclicPayloadGraph`.
+- Add seeded max-flow differential tests, exhaustive min-cost-flow reference
+  checks, Linux property tests, Miri coverage, and libFuzzer mutation targets.
+- Add equal-contract lazy traversal, generic Dijkstra, and stable-mutation
+  competitor benchmarks; remove per-node adjacency allocations after the first
+  benchmark exposed a stable-build bottleneck.
+- Add a 200,000-node / 1,000,000-edge scale harness with exact-count and
+  differential correctness checks, fair dual-CSR preprocessing comparisons,
+  rich evidence construction, and isolated peak-working-set measurements.
+- Add P0/P1 shortest-path, cut, isomorphism, matching, clique, coloring,
+  feedback-arc, Steiner-tree, and structural graph algorithms with seeded
+  differential tests and equal-contract competitor benchmarks.
+- Add automatic Floyd-Warshall/Johnson selection with one-time weight
+  snapshotting and an explicit strategy result.
+- Add validated deterministic DOT, Graph6, and GraphML topology interchange.
+- Add `BitMatrix`, seeded DAG plus deterministic star/grid/bipartite
+  generators, and generic directed/undirected payload graphs.
+- Add a real `no_std + alloc` build while retaining hash-backed maps under the
+  default `std` feature.
+- Add optional Rayon BFS and Dijkstra batch APIs that preserve input order.
+- Add an opt-in `unsafe-fast` bit-matrix module with checked and
+  caller-validated lookup APIs; keep the default lookup fully safe.
+- Add P2 correctness tests, release benchmarks, documentation, and a dedicated
+  CI gate for `cargo check --no-default-features --lib`.
+- Keep the MIT license, isolate unsafe code to one feature-gated module, retain
+  the 300-line source budget, and keep `serde` as the only default dependency.
+
 ## 0.4.0 - 2026-07-23
 
 - Add A* with admissible heuristics, direction selection, and edge filtering.

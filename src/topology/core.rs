@@ -1,5 +1,6 @@
 use super::csr::Csr;
 use super::{EdgeEndpoints, EdgeIndex, GraphView, IndexGraphView, NodeIndex};
+use crate::Vec;
 use crate::{GraphError, Result};
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 
@@ -165,17 +166,11 @@ impl GraphView for Topology {
         self.edge_indices().zip(self.endpoints.iter().copied())
     }
 
-    fn outgoing_edges(
-        &self,
-        node: NodeIndex,
-    ) -> impl DoubleEndedIterator<Item = EdgeIndex> + ExactSizeIterator + '_ {
+    fn outgoing_edges(&self, node: NodeIndex) -> impl Iterator<Item = EdgeIndex> + '_ {
         self.outgoing_edges(node)
     }
 
-    fn incoming_edges(
-        &self,
-        node: NodeIndex,
-    ) -> impl DoubleEndedIterator<Item = EdgeIndex> + ExactSizeIterator + '_ {
+    fn incoming_edges(&self, node: NodeIndex) -> impl Iterator<Item = EdgeIndex> + '_ {
         self.incoming_edges(node)
     }
 }
@@ -205,7 +200,7 @@ struct TopologyWire {
 }
 
 impl<'de> Deserialize<'de> for Topology {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

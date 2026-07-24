@@ -1,6 +1,5 @@
 use crate::IndexGraphView;
-use std::collections::HashMap;
-use std::hash::Hash;
+use crate::Vec;
 
 type Adjacency<Node> = Vec<Vec<Node>>;
 
@@ -8,12 +7,12 @@ type Adjacency<Node> = Vec<Vec<Node>>;
 pub struct Dominators<Node> {
     root: Node,
     reachable: Vec<Node>,
-    immediate: HashMap<Node, Node>,
+    immediate: Vec<(Node, Node)>,
 }
 
 impl<Node> Dominators<Node>
 where
-    Node: Copy + Eq + Hash,
+    Node: Copy + Eq,
 {
     #[must_use]
     pub const fn root(&self) -> Node {
@@ -27,9 +26,15 @@ where
 
     #[must_use]
     pub fn immediate_dominator(&self, node: Node) -> Option<Node> {
-        (node != self.root)
-            .then(|| self.immediate.get(&node).copied())
-            .flatten()
+        (node != self.root).then(|| {
+            self.immediate
+                .iter()
+                .find_map(|&(candidate, parent)| (candidate == node).then_some(parent))
+        })?
+    }
+
+    pub fn immediate_dominators(&self) -> impl Iterator<Item = (Node, Node)> + '_ {
+        self.immediate.iter().copied()
     }
 
     pub fn dominators(&self, node: Node) -> Option<DominatorsIter<'_, Node>> {
@@ -60,8 +65,13 @@ where
             .is_some_and(|mut chain| chain.any(|candidate| candidate == dominator))
     }
 
-    fn is_reachable(&self, node: Node) -> bool {
-        node == self.root || self.immediate.contains_key(&node)
+    #[must_use]
+    pub fn is_reachable(&self, node: Node) -> bool {
+        node == self.root
+            || self
+                .immediate
+                .iter()
+                .any(|&(candidate, _)| candidate == node)
     }
 }
 
@@ -72,15 +82,13 @@ pub struct DominatorsIter<'result, Node> {
 
 impl<Node> Iterator for DominatorsIter<'_, Node>
 where
-    Node: Copy + Eq + Hash,
+    Node: Copy + Eq,
 {
     type Item = Node;
 
     fn next(&mut self) -> Option<Self::Item> {
         let node = self.next?;
-        self.next = (node != self.result.root)
-            .then(|| self.result.immediate.get(&node).copied())
-            .flatten();
+        self.next = self.result.immediate_dominator(node);
         Some(node)
     }
 }

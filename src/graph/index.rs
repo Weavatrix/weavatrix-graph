@@ -1,5 +1,9 @@
 use crate::{Edge, GraphError, Node, NodeId, Result, Topology};
-use std::collections::HashMap;
+use crate::{ToString, Vec};
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as NodeMap;
+#[cfg(feature = "std")]
+use std::collections::HashMap as NodeMap;
 
 pub(super) fn canonicalize_edges(
     nodes: &[Node],
@@ -48,7 +52,26 @@ pub(super) fn index_canonical_edges(nodes: &[Node], edges: &[Edge]) -> Result<To
     Topology::try_from_usize_edges(nodes.len(), endpoints)
 }
 
-fn node_positions(nodes: &[Node]) -> HashMap<&NodeId, usize> {
+pub(super) fn index_sorted_edges(nodes: &[Node], edges: &[Edge]) -> Result<Topology> {
+    let positions = node_positions(nodes);
+    let mut endpoints = Vec::with_capacity(edges.len());
+    let mut source_cursor = 0;
+    for edge in edges {
+        while source_cursor < nodes.len() && nodes[source_cursor].id < edge.source {
+            source_cursor += 1;
+        }
+        if source_cursor == nodes.len() || nodes[source_cursor].id != edge.source {
+            return Err(GraphError::MissingEdgeSource {
+                id: edge.source.to_string(),
+            });
+        }
+        let target = position(&positions, &edge.target, false)?;
+        endpoints.push((source_cursor, target));
+    }
+    Topology::try_from_usize_edges(nodes.len(), endpoints)
+}
+
+fn node_positions(nodes: &[Node]) -> NodeMap<&NodeId, usize> {
     nodes
         .iter()
         .enumerate()
@@ -56,7 +79,7 @@ fn node_positions(nodes: &[Node]) -> HashMap<&NodeId, usize> {
         .collect()
 }
 
-fn position(positions: &HashMap<&NodeId, usize>, id: &NodeId, source: bool) -> Result<usize> {
+fn position(positions: &NodeMap<&NodeId, usize>, id: &NodeId, source: bool) -> Result<usize> {
     positions.get(id).copied().ok_or_else(|| {
         if source {
             GraphError::MissingEdgeSource { id: id.to_string() }

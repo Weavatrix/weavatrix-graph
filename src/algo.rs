@@ -1,31 +1,40 @@
+mod all_pairs;
 mod astar;
+mod auto;
 mod bellman;
+mod biconnected;
+mod bipartite;
+mod chains;
+mod cliques;
+mod coloring;
 mod components;
+mod cuts;
+mod cycles;
+mod dag_paths;
+mod distance;
+mod dominance_frontier;
 mod dominators;
+mod enumeration;
+mod feedback;
 mod flow;
+mod isomorphism;
+mod isomorphism_match;
+mod matching;
+mod measure;
 mod mst;
+mod network;
+#[cfg(feature = "rayon")]
+mod parallel;
 mod rank;
 mod shortest;
+mod shortest_extra;
+mod steiner;
 mod transitive;
 mod traversal;
+mod undirected_neighbors;
+mod undirected_snapshot;
+mod walk;
 
-pub use astar::{astar, astar_filtered};
-pub use bellman::{BellmanFord, SignedPath, bellman_ford, bellman_ford_filtered};
-pub use components::{
-    Condensation, condensation, condensation_filtered, find_cycle, find_cycle_filtered, has_cycle,
-    has_cycle_filtered, strongly_connected_components, strongly_connected_components_filtered,
-    topological_sort, topological_sort_filtered, weakly_connected_components,
-    weakly_connected_components_filtered,
-};
-pub use dominators::{Dominators, DominatorsIter, dominators, dominators_filtered};
-pub use flow::{MaxFlow, maximum_flow};
-pub use mst::{SpanningForest, minimum_spanning_forest};
-pub use rank::{page_rank, page_rank_filtered};
-pub use shortest::{WeightedPath, dijkstra, dijkstra_filtered};
-pub use transitive::{
-    DagTransitive, dag_transitive_reduction_closure, dag_transitive_reduction_closure_filtered,
-};
-pub use traversal::{
-    Direction, bfs, bfs_filtered, dfs, dfs_filtered, reachable, reachable_filtered, shortest_path,
-    shortest_path_filtered,
-};
+mod api;
+
+pub use api::*;

@@ -1,4 +1,5 @@
 use super::SourceSpan;
+use crate::String;
 use crate::{EvidenceKind, GraphError, Result};
 use serde::{Deserialize, Serialize};
 

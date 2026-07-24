@@ -2,19 +2,33 @@ use super::core::Graph;
 use super::index::canonicalize_edges;
 use super::validate::{validate_edge, validate_node};
 use crate::{Edge, GraphError, Node, NodeId, Result};
-use std::collections::HashMap;
+use crate::{ToString, Vec};
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as NodeMap;
+#[cfg(feature = "std")]
+use std::collections::HashMap as NodeMap;
 
 #[derive(Debug, Default)]
 pub struct GraphBuilder {
-    nodes: HashMap<NodeId, Node>,
+    nodes: NodeMap<NodeId, Node>,
     edges: Vec<Edge>,
+}
+
+#[cfg(feature = "std")]
+fn node_map_with_capacity(capacity: usize) -> NodeMap<NodeId, Node> {
+    NodeMap::with_capacity(capacity)
+}
+
+#[cfg(not(feature = "std"))]
+fn node_map_with_capacity(_: usize) -> NodeMap<NodeId, Node> {
+    NodeMap::new()
 }
 
 impl GraphBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            nodes: HashMap::new(),
+            nodes: NodeMap::new(),
             edges: Vec::new(),
         }
     }
@@ -23,7 +37,7 @@ impl GraphBuilder {
     #[must_use]
     pub fn with_capacity(nodes: usize, edges: usize) -> Self {
         Self {
-            nodes: HashMap::with_capacity(nodes),
+            nodes: node_map_with_capacity(nodes),
             edges: Vec::with_capacity(edges),
         }
     }

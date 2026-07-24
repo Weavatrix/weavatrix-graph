@@ -33,17 +33,11 @@ impl GraphView for WorkingGraph {
         WorkingGraph::edge_endpoints(self, edge)
     }
 
-    fn outgoing_edges(
-        &self,
-        node: Self::Node,
-    ) -> impl DoubleEndedIterator<Item = Self::Edge> + ExactSizeIterator + '_ {
+    fn outgoing_edges(&self, node: Self::Node) -> impl Iterator<Item = Self::Edge> + '_ {
         WorkingGraph::outgoing_edges(self, node)
     }
 
-    fn incoming_edges(
-        &self,
-        node: Self::Node,
-    ) -> impl DoubleEndedIterator<Item = Self::Edge> + ExactSizeIterator + '_ {
+    fn incoming_edges(&self, node: Self::Node) -> impl Iterator<Item = Self::Edge> + '_ {
         WorkingGraph::incoming_edges(self, node)
     }
 }

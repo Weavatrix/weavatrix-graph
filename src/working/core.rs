@@ -1,7 +1,11 @@
 use super::{StableEdgeKey, StableNodeKey};
 use crate::graph::validate::{validate_edge, validate_node};
 use crate::{Edge, EdgeEndpoints, GraphError, Node, NodeId, Result};
-use std::collections::HashMap;
+use crate::{ToString, Vec};
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as NodeMap;
+#[cfg(feature = "std")]
+use std::collections::HashMap as NodeMap;
 
 pub(super) struct WorkingEdge {
     pub(super) value: Edge,
@@ -25,7 +29,7 @@ pub(super) struct EdgeSlot {
 pub struct WorkingGraph {
     pub(super) nodes: Vec<NodeSlot>,
     pub(super) edges: Vec<EdgeSlot>,
-    pub(super) node_by_id: HashMap<NodeId, StableNodeKey>,
+    pub(super) node_by_id: NodeMap<NodeId, StableNodeKey>,
     pub(super) free_nodes: Vec<u32>,
     pub(super) free_edges: Vec<u32>,
     pub(super) node_count: usize,
@@ -43,7 +47,7 @@ impl WorkingGraph {
         Self {
             nodes: Vec::with_capacity(nodes),
             edges: Vec::with_capacity(edges),
-            node_by_id: HashMap::with_capacity(nodes),
+            node_by_id: node_map_with_capacity(nodes),
             free_nodes: Vec::new(),
             free_edges: Vec::new(),
             node_count: 0,
@@ -252,4 +256,14 @@ impl WorkingGraph {
         });
         Ok(StableEdgeKey::new(slot, 0))
     }
+}
+
+#[cfg(feature = "std")]
+fn node_map_with_capacity(capacity: usize) -> NodeMap<NodeId, StableNodeKey> {
+    NodeMap::with_capacity(capacity)
+}
+
+#[cfg(not(feature = "std"))]
+fn node_map_with_capacity(_: usize) -> NodeMap<NodeId, StableNodeKey> {
+    NodeMap::new()
 }

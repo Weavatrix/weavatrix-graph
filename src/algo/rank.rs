@@ -1,4 +1,5 @@
 use crate::{GraphError, IndexGraphView, Result};
+use crate::{ToString, Vec};
 
 /// Computes `PageRank` in graph node order.
 ///
@@ -68,7 +69,7 @@ where
             next[target] += damping * ranks[source] / usize_as_f64(out_degree[source]);
         }
         normalize(&mut next);
-        std::mem::swap(&mut ranks, &mut next);
+        core::mem::swap(&mut ranks, &mut next);
     }
     Ok(nodes.into_iter().zip(ranks).collect())
 }

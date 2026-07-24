@@ -2,9 +2,10 @@ use crate::{
     AttributeValue, Confidence, Edge, EdgeKind, EvidenceKind, Graph, GraphBuilder, Node, NodeId,
     NodeKind, Provenance, Result, SourcePosition, SourceSpan,
 };
+use crate::{String, Vec};
+use alloc::collections::BTreeMap;
+use core::str::FromStr;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::str::FromStr;
 
 /// Compatibility representation for the current JavaScript Weavatrix graph.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -223,11 +224,11 @@ impl LegacyRange {
 }
 
 fn infer_label(id: &str) -> String {
-    id.rsplit(['/', '#']).next().unwrap_or(id).to_owned()
+    String::from(id.rsplit(['/', '#']).next().unwrap_or(id))
 }
 
 fn infer_edge_file(source: &str) -> String {
-    source.split('#').next().unwrap_or(source).to_owned()
+    String::from(source.split('#').next().unwrap_or(source))
 }
 
 fn parse_node_kind(value: Option<&str>, id: &str) -> NodeKind {

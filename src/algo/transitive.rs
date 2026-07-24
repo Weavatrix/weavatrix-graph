@@ -1,4 +1,5 @@
 use super::topological_sort_filtered;
+use crate::Vec;
 use crate::{EdgeEndpoints, IndexGraphView};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
