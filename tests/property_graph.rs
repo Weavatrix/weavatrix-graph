@@ -7,11 +7,16 @@ use weavatrix_graph::{
     dijkstra_measure, edge_filtered, k_core_numbers, reversed,
 };
 
+fn node_index(value: u8, node_count: usize) -> NodeIndex {
+    let node_count = u32::try_from(node_count).expect("property range fits u32");
+    NodeIndex::new(u32::from(value) % node_count)
+}
+
 fn graph(node_count: usize, raw_edges: &[(u8, u8)]) -> Topology {
     let edges = raw_edges.iter().map(|&(source, target)| {
         EdgeEndpoints::new(
-            NodeIndex::new(u32::from(source) % node_count as u32),
-            NodeIndex::new(u32::from(target) % node_count as u32),
+            node_index(source, node_count),
+            node_index(target, node_count),
         )
     });
     Topology::try_from_edges(node_count, edges).unwrap()
@@ -27,7 +32,7 @@ proptest! {
         start in any::<u8>(),
     ) {
         let graph = graph(node_count, &edges);
-        let start = NodeIndex::new(u32::from(start) % node_count as u32);
+        let start = node_index(start, node_count);
         let mut workspace = TraversalWorkspace::new();
         prop_assert_eq!(
             bfs_iter(&graph, start, &mut workspace).collect::<Vec<_>>(),
@@ -45,13 +50,15 @@ proptest! {
         let raw = edges.iter().map(|&(source, target, _)| (source, target)).collect::<Vec<_>>();
         let graph = graph(node_count, &raw);
         let weights = edges.iter().map(|edge| edge.2).collect::<Vec<_>>();
-        let source = NodeIndex::new(u32::from(source) % node_count as u32);
-        let target = NodeIndex::new(u32::from(target) % node_count as u32);
+        let source = node_index(source, node_count);
+        let target = node_index(target, node_count);
         let specialized = dijkstra(&graph, source, target, |edge| u64::from(weights[edge.index()]));
         let generic = dijkstra_measure(&graph, source, target, |edge| weights[edge.index()])
             .unwrap();
         prop_assert_eq!(
-            specialized.as_ref().map(|path| path.total_cost()),
+            specialized
+                .as_ref()
+                .map(weavatrix_graph::WeightedPath::total_cost),
             generic.as_ref().map(|path| u64::from(path.total_cost())),
         );
     }
