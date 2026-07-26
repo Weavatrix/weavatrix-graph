@@ -77,6 +77,7 @@ jobs:
           cargo +nightly miri test --test network_analytics
           cargo +nightly miri test --test stable_payload
           cargo +nightly miri test --test keyed_stable_undirected
+          cargo +nightly miri test --all-features --lib direct_write_and_cursor_reuse_preserve_layout
 
   fuzz-smoke:
     name: Fuzz smoke

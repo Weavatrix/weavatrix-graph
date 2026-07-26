@@ -1,6 +1,11 @@
 use super::{EdgeEndpoints, EdgeIndex};
 use crate::Vec;
 use crate::{GraphError, Result};
+#[cfg(feature = "rayon")]
+mod parallel;
+
+#[cfg(all(feature = "rayon", feature = "unsafe-fast"))]
+mod unsafe_fast;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Csr {
@@ -65,11 +70,37 @@ impl Csr {
         ))
     }
 
+    #[cfg(feature = "rayon")]
+    pub(super) fn try_build_pair_parallel(
+        node_count: usize,
+        endpoints: &[EdgeEndpoints],
+        stable_order: bool,
+    ) -> Result<(Self, Self)> {
+        parallel::try_build_pair(node_count, endpoints, stable_order)
+    }
+
+    #[cfg(all(feature = "rayon", feature = "unsafe-fast"))]
+    pub(super) fn try_build_pair_parallel_fast(
+        node_count: usize,
+        endpoints: &[EdgeEndpoints],
+        stable_order: bool,
+    ) -> Result<(Self, Self)> {
+        unsafe_fast::try_build_pair(node_count, endpoints, stable_order)
+    }
+
     pub(crate) fn get(&self, node: usize) -> &[EdgeIndex] {
         let Some((&start, &end)) = self.offsets.get(node).zip(self.offsets.get(node + 1)) else {
             return &[];
         };
         &self.edges[start as usize..end as usize]
+    }
+
+    pub(crate) fn offsets(&self) -> &[u32] {
+        &self.offsets
+    }
+
+    pub(crate) fn edges(&self) -> &[EdgeIndex] {
+        &self.edges
     }
 
     pub(crate) fn try_build_undirected(
@@ -108,6 +139,30 @@ impl Csr {
         }
         Ok(Self { offsets, edges })
     }
+}
+
+#[cfg(feature = "rayon")]
+fn sort_adjacencies(offsets: &[u32], edges: &mut [EdgeIndex], base: u32) {
+    const NODE_GRAIN: usize = 8_192;
+    let node_count = offsets.len().saturating_sub(1);
+    if node_count <= NODE_GRAIN {
+        for pair in offsets.windows(2) {
+            let start = (pair[0] - base) as usize;
+            let end = (pair[1] - base) as usize;
+            edges[start..end].sort_unstable();
+        }
+        return;
+    }
+    let middle = node_count / 2;
+    let edge_middle = (offsets[middle] - base) as usize;
+    let (left_edges, right_edges) = edges.split_at_mut(edge_middle);
+    let left_offsets = &offsets[..=middle];
+    let right_offsets = &offsets[middle..];
+    let right_base = right_offsets[0];
+    rayon::join(
+        || sort_adjacencies(left_offsets, left_edges, base),
+        || sort_adjacencies(right_offsets, right_edges, right_base),
+    );
 }
 
 fn offsets(counts: &[u32], capacity_hint: usize) -> Result<Vec<u32>> {

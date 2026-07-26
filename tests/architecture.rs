@@ -38,7 +38,24 @@ fn domain_modules_use_facades_with_focused_leaf_files() {
         &root,
         "src/topology.rs",
         "src/topology",
-        &["core.rs", "csr.rs", "index.rs", "view.rs"],
+        &["core.rs", "csr.rs", "index.rs", "parallel.rs", "view.rs"],
+    );
+    assert_leaf_modules(
+        &root,
+        "src/traversal_cache.rs",
+        "src/traversal_cache",
+        &[
+            "adaptive.rs",
+            "build.rs",
+            "core.rs",
+            "eager.rs",
+            "elias_fano.rs",
+            "ergonomics.rs",
+            "iter.rs",
+            "packed.rs",
+            "parallel.rs",
+            "walk.rs",
+        ],
     );
     assert_leaf_modules(
         &root,

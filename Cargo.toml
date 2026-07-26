@@ -26,9 +26,11 @@ serde = { version = "1.0.229", default-features = false, features = ["alloc", "d
 [dev-dependencies]
 biconnected-components = "0.5.0"
 graaf = "0.112.0"
-petgraph = { version = "0.8.3", default-features = false, features = ["std", "stable_graph"] }
+graph_builder = "0.4.2"
+petgraph = { version = "0.8.3", default-features = false, features = ["std", "stable_graph", "rayon"] }
 rustworkx-core = "0.18.0"
 serde_json = "1.0.151"
+weavatrix-scan = "0.3.0"
 
 [target.'cfg(not(windows))'.dev-dependencies]
 proptest = "1.9.0"
@@ -97,6 +99,21 @@ harness = false
 [[bench]]
 name = "keyed_stable_structures"
 harness = false
+
+[[bench]]
+name = "parallel_scale_competitors"
+harness = false
+required-features = ["rayon"]
+
+[[bench]]
+name = "filesystem_graph_workload"
+harness = false
+required-features = ["rayon", "unsafe-fast"]
+
+[[bench]]
+name = "traversal_cache_competitors"
+harness = false
+required-features = ["rayon", "unsafe-fast"]
 
 [lints.rust]
 unsafe_code = "deny"

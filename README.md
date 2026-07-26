@@ -24,6 +24,8 @@ an MCP/CLI transport.
 - structured node and edge attributes for parser-specific metadata;
 - deterministic node and edge order independent of insertion order;
 - compact numeric endpoints with incoming and outgoing CSR indexes;
+- an optional direct-neighbor traversal cache with automatic, fast, bit-packed,
+  and succinct layouts, reusable eager/lazy walks, and no new dependency;
 - a mutable insertion-order graph with generation-stable node and edge keys;
 - allocation-reusing lazy BFS, DFS, and generic Dijkstra iterators, early
   stopping, DFS events, and reusable workspaces;
@@ -79,7 +81,8 @@ an MCP/CLI transport.
 - validated deserialization that cannot bypass graph invariants;
 - compatibility conversion from Weavatrix's legacy `{ nodes, links }` graph;
 - no unsafe code in the default or featureless `no_std` build; the opt-in
-  `unsafe-fast` feature is confined to one audited bit-matrix module;
+  `unsafe-fast` feature is confined to audited bit-matrix and parallel-CSR
+  primitives;
 - the default build has one runtime dependency, `serde`, while the optional
   `rayon` feature is isolated from the core.
 
@@ -91,6 +94,7 @@ for every feature:
 | Type | Purpose | Ordering and validation |
 | --- | --- | --- |
 | `Topology` | Immutable directed numeric graph | Preserves edge order, validates compact endpoints, builds outgoing and incoming CSR |
+| `TraversalCache` | Optional derived neighbor topology | Keeps both directions and exact adjacency order; selects direct, bit-packed, or succinct storage |
 | `WorkingGraph` | Fast rich mutation and incremental extraction | Preserves insertion order, validates local invariants once, uses generation-stable keys |
 | `Graph` | Immutable evidence snapshot and wire format | Sorts, deduplicates, validates, and emits canonical output |
 | `UndirectedTopology` | General-purpose undirected algorithms | Compact incidence CSR with parallel-edge and self-loop support |
@@ -327,6 +331,61 @@ Parallel batches are explicit and optional:
 weavatrix-graph = { version = "0.5", features = ["rayon"] }
 ```
 
+Large topology construction can select a measured sequential/Rayon crossover
+while preserving stable edge indexes and adjacency order:
+
+```rust
+# use weavatrix_graph::{EdgeEndpoints, NodeIndex, Topology};
+# let edges = [EdgeEndpoints::new(NodeIndex::new(0), NodeIndex::new(1))];
+# #[cfg(feature = "rayon")]
+# {
+let topology = Topology::try_from_edges_auto(2, edges)?;
+# assert_eq!(topology.edge_count(), 1);
+# }
+# Ok::<(), weavatrix_graph::GraphError>(())
+```
+
+`try_from_edges_parallel` always uses the safe stable-order Rayon builder.
+`try_from_edges_parallel_unordered` keeps edge identity but leaves node-local
+adjacency order unspecified. The automatic builder uses sequential construction
+below 1.5 million edges, where scheduling and atomic setup usually cost more
+than they save.
+
+Traversal-heavy callers can derive a separate cache without weakening stable
+edge identity or evidence storage:
+
+```rust
+# use weavatrix_graph::{
+#     Direction, EdgeEndpoints, NodeIndex, Topology, TraversalCacheWorkspace,
+#     TraversalStorage,
+# };
+# let topology = Topology::try_from_edges(
+#     2,
+#     [EdgeEndpoints::new(NodeIndex::new(0), NodeIndex::new(1))],
+# )?;
+let cache = topology.traversal_cache(); // speed-aware Auto policy
+let mut workspace = TraversalCacheWorkspace::new();
+let visited = cache.bfs_with_workspace(
+    NodeIndex::new(0),
+    Direction::Outgoing,
+    &mut workspace,
+);
+assert_eq!(visited.len(), 2);
+
+let compact = topology.traversal_cache_with(TraversalStorage::Compact);
+assert_eq!(compact.edge_count(), 1);
+# Ok::<(), weavatrix_graph::GraphError>(())
+```
+
+`Fast` stores direct `u32` neighbors and offsets. `Balanced` bit-packs neighbor
+ids while retaining direct offsets. `Compact` adds Elias-Fano monotone offsets
+and automatically uses block-local frame-of-reference neighbor packing only
+when its exact encoded size beats global packing. `Auto` chooses `Balanced`
+only when it saves at least 12.5%; otherwise it keeps `Fast`. All modes preserve
+parallel edges, self-loops, and node-local adjacency order. `Graph` exposes the
+same two convenience methods, and `From<&Topology>` / `From<&Graph>` are
+available for generic construction.
+
 `bfs_batch_parallel` and `dijkstra_batch_parallel` preserve query order and the
 same deterministic result contract as their sequential counterparts. They are
 intended for batches large enough to amortize scheduling, not as replacements
@@ -343,6 +402,9 @@ The default `BitMatrix::contains` remains fully safe. With `unsafe-fast`,
 `contains_fast` keeps a safe API and validates both endpoints before one
 unchecked word access. `contains_unchecked` removes endpoint checks too and is
 an `unsafe fn`: callers must guarantee that both indexes are inside the matrix.
+The same feature exposes `try_from_edges_parallel_fast` and its unordered
+variant. Their public API remains safe; an isolated scatter backend writes
+validated edge slots directly and reuses atomic cursor storage as final offsets.
 Enabling the feature never silently changes the behavior of `contains`.
 
 ## Extension Kinds
@@ -507,6 +569,92 @@ the graph. Reproduce the scale run with:
 
 ```sh
 cargo bench --locked --all-features --bench scale_graph_competitors
+```
+
+### Parallel construction at 1M, 10M, and 100M edges
+
+This follow-up compares parallel with parallel. It ran locally on Windows 11,
+Rust 1.97.1, and an Intel Core Ultra 7 255U with 14 Rayon workers. The
+deterministic input has five outgoing edges per node. The 1M and 10M rows are
+medians of nine and seven measured builds; 100M is a three-build median after
+one warmup.
+
+| Nodes / edges | weavatrix-graph | `graph_builder 0.4.2` Rayon | Result |
+| --- | ---: | ---: | --- |
+| 200k / 1M, auto stable | 14.165 ms | 15.223 ms | Weavatrix 7.5% faster |
+| 2M / 10M, safe stable | 178.705 ms | 115.697 ms | narrower competitor 35.3% faster |
+| 2M / 10M, `unsafe-fast` stable | 117.888 ms | 115.697 ms | within 1.9% |
+| 20M / 100M, `unsafe-fast` stable | 1.705 s | 1.518 s | narrower competitor 12.3% faster |
+| 20M / 100M, `unsafe-fast` unordered | 1.662 s | 1.518 s | narrower competitor 9.5% faster |
+
+Both sides ingest arbitrary endpoint order, validate or infer bounds, and build
+incoming plus outgoing CSR. The contracts are not identical:
+`weavatrix-graph::Topology` also retains the original endpoint array, stable
+`EdgeIndex` identity, parallel-edge identity, and, in stable modes,
+deterministic node-local edge order. `graph_builder` stores direct neighbor
+targets and uses internal unchecked scatter writes. Its row is a throughput
+lower bound, not evidence that the stronger snapshot is incorrect. Every
+Weavatrix stable build is asserted equal to the sequential topology before
+timing.
+
+The original evidence topology exposes the cost of resolving an `EdgeIndex`
+through the endpoint array:
+
+| Nodes / edges | Weavatrix evidence CSR | Direct-neighbor CSR | Result |
+| --- | ---: | ---: | --- |
+| 200k / 1M | 10.179 ms | 6.902 ms | direct neighbors 1.47x faster |
+| 2M / 10M | 102.811 ms | 75.804 ms | direct neighbors 1.36x faster |
+
+Both adapters assert the same reachable count. The derived `TraversalCache`
+closes that gap without changing `Topology`. An interleaved, allocation-reusing
+BFS comparison on the same five-outgoing-edge workload measured:
+
+| Nodes / edges | Layout | Encoded dual-cache bytes | Weavatrix BFS | Paired `graph_builder` BFS | Result |
+| --- | --- | ---: | ---: | ---: | --- |
+| 200k / 1M | Fast | 9.60 MB | 17.131 ms | 17.636 ms | 2.9% faster |
+| 200k / 1M | Balanced | 6.10 MB | 28.104 ms | 18.197 ms | 36.5% less memory, slower traversal |
+| 200k / 1M | Compact | 4.55 MB | 76.027 ms | 18.592 ms | 52.6% less memory, smallest layout |
+| 2M / 10M | Fast | 96.00 MB | 345.978 ms | 394.968 ms | 12.4% faster |
+| 2M / 10M | Balanced | 68.50 MB | 464.830 ms | 322.858 ms | 28.6% less memory |
+| 2M / 10M | Compact | 48.78 MB | 1,251.840 ms | 415.216 ms | 49.2% less memory |
+
+The times are medians of nine runs at 1M edges and five runs at 10M, with the
+measurement order alternated every run. Cache and competitor return the same
+reachable count; both reuse traversal marks and queue storage. The compressed
+layouts are explicit space/latency choices, not claims that bit decoding is
+free. At 20M nodes / 100M edges the measured encoded sizes were 960.00 MB
+(`Fast`), 785.00 MB (`Balanced`), and 536.76 MB (`Compact`). On adjacency with
+local ids, Compact can reduce this further through block-local frames while
+preserving the original order.
+
+On the equal all-pairs output contract, parallel Johnson measured 41.638 ms
+here versus petgraph's 64.769 ms, 1.56x faster.
+
+The real-filesystem harness scanned `C:\Windows` with `weavatrix-scan 0.3.0`,
+then built a parent-child containment graph. The scan returned 192,575 files,
+240,734 nodes, 240,733 edges, and 51 warnings (`complete=false`) in 1.904 s.
+Scanning is outside the graph-build interval:
+
+| Real containment graph | Median |
+| --- | ---: |
+| Weavatrix auto stable | 3.469 ms |
+| Weavatrix forced Rayon stable | 6.782 ms |
+| `graph_builder` Rayon, narrower contract | 5.653 ms |
+
+The real graph confirms why automatic selection matters: sequential construction
+is 38.6% faster than the narrower parallel competitor at this size. Reproduce
+the synthetic and filesystem runs with:
+
+```powershell
+cargo bench --locked --all-features --bench parallel_scale_competitors
+cargo bench --locked --all-features --bench traversal_cache_competitors
+$env:WEAVATRIX_GRAPH_NODES=20000000
+$env:WEAVATRIX_GRAPH_EDGES=100000000
+$env:WEAVATRIX_GRAPH_RUNS=3
+$env:WEAVATRIX_GRAPH_MODE="fast"
+cargo bench --locked --all-features --bench parallel_scale_competitors
+$env:WEAVATRIX_REAL_ROOT="C:\Windows"
+cargo bench --locked --all-features --bench filesystem_graph_workload
 ```
 
 ### Advanced algorithms
@@ -760,9 +908,10 @@ Extractors that already emit sorted nodes can use
 deduplication, and both indexes. Unordered input safely falls back to the
 canonicalizing constructor.
 
-`petgraph`, `graaf`, and `rustworkx-core` are dev-dependencies only. The default
-runtime dependency budget remains `serde`; Rayon and its transitive dependencies
-appear only when the `rayon` feature is explicitly selected.
+`petgraph`, `graaf`, `graph_builder`, `rustworkx-core`, and `weavatrix-scan` are
+dev-dependencies only. The default runtime dependency budget remains `serde`;
+Rayon and its transitive dependencies appear only when the `rayon` feature is
+explicitly selected.
 
 Timing varies by allocator, CPU, and build toolchain. Run the included harnesses
 on the deployment target before using these figures for capacity planning.

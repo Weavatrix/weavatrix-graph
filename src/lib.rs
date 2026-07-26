@@ -25,6 +25,7 @@ mod model;
 mod operator;
 mod payload;
 mod topology;
+mod traversal_cache;
 mod undirected;
 mod view;
 mod working;
@@ -98,6 +99,10 @@ pub use payload::{
     UndirectedPayloadGraph,
 };
 pub use topology::{EdgeEndpoints, EdgeIndex, GraphView, IndexGraphView, NodeIndex, Topology};
+pub use traversal_cache::{
+    CacheBfs, CacheDfs, NeighborIter, TraversalCache, TraversalCacheWorkspace, TraversalLayout,
+    TraversalStorage,
+};
 pub use undirected::{IndexUndirectedGraphView, UndirectedGraphView, UndirectedTopology};
 pub use view::{
     EdgeFiltered, NodeFiltered, Reversed, edge_filtered, induced_subgraph_view, reversed,

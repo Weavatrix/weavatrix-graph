@@ -25,23 +25,48 @@ impl Topology {
         node_count: usize,
         edges: impl IntoIterator<Item = EdgeEndpoints>,
     ) -> Result<Self> {
+        Self::try_from_collected(node_count, edges.into_iter().collect())
+    }
+
+    pub(super) fn try_from_collected(
+        node_count: usize,
+        endpoints: Vec<EdgeEndpoints>,
+    ) -> Result<Self> {
+        let compact_node_count = Self::validate_capacity(node_count, endpoints.len())?;
+        let (outgoing, incoming) = Csr::try_build_pair(node_count, &endpoints)?;
+        Ok(Self::from_parts(
+            compact_node_count,
+            endpoints,
+            outgoing,
+            incoming,
+        ))
+    }
+
+    pub(super) fn validate_capacity(node_count: usize, edge_count: usize) -> Result<u32> {
         let compact_node_count =
             u32::try_from(node_count).map_err(|_| GraphError::IndexCapacityExceeded {
                 category: "nodes",
                 count: node_count,
             })?;
-        let endpoints = edges.into_iter().collect::<Vec<_>>();
-        u32::try_from(endpoints.len()).map_err(|_| GraphError::IndexCapacityExceeded {
+        u32::try_from(edge_count).map_err(|_| GraphError::IndexCapacityExceeded {
             category: "edges",
-            count: endpoints.len(),
+            count: edge_count,
         })?;
-        let (outgoing, incoming) = Csr::try_build_pair(node_count, &endpoints)?;
-        Ok(Self {
-            node_count: compact_node_count,
+        Ok(compact_node_count)
+    }
+
+    pub(super) fn from_parts(
+        node_count: u32,
+        endpoints: Vec<EdgeEndpoints>,
+        outgoing: Csr,
+        incoming: Csr,
+    ) -> Self {
+        Self {
+            node_count,
             endpoints,
             outgoing,
             incoming,
-        })
+        }
     }
 
     pub(crate) fn try_from_usize_edges(
@@ -127,6 +152,10 @@ impl Topology {
     pub fn in_degree(&self, node: NodeIndex) -> Option<usize> {
         self.contains_node(node)
             .then(|| self.incoming.get(node.index()).len())
+    }
+
+    pub(crate) fn traversal_parts(&self) -> (&[EdgeEndpoints], &Csr, &Csr) {
+        (&self.endpoints, &self.outgoing, &self.incoming)
     }
 }
 

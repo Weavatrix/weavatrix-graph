@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Add safe and opt-in `unsafe-fast` parallel dual-CSR builders with stable and
+  unordered adjacency policies, automatic scale selection, Miri coverage, and
+  reproducible 1M/10M/100M plus real-filesystem benchmarks.
+- Add an optional dual-direction `TraversalCache` with direct, bit-packed, and
+  succinct Elias-Fano layouts, adaptive local-id compression, exact adjacency
+  preservation, lazy/eager BFS and DFS, reusable workspaces, and competitor
+  benchmarks.
+
 ## 0.5.0 - 2026-07-24
 
 - Add `KeyedPayloadGraph` for GraphMap-style domain lookup backed by

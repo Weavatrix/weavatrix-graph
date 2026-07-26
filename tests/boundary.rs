@@ -24,11 +24,13 @@ fn library_has_no_process_network_or_unscoped_unsafe_path() {
                 path.display()
             );
         }
-        let is_unsafe_fast = path.ends_with(Path::new("matrix/bit/unsafe_fast.rs"));
+        let is_unsafe_fast = ["matrix/bit/unsafe_fast.rs", "topology/csr/unsafe_fast.rs"]
+            .iter()
+            .any(|allowed| path.ends_with(Path::new(allowed)));
         if !is_unsafe_fast {
             assert!(
                 !source.contains("unsafe {") && !source.contains("unsafe fn"),
-                "{} contains unsafe code outside the opt-in matrix module",
+                "{} contains unsafe code outside an opt-in fast module",
                 path.display()
             );
         }

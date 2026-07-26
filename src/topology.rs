@@ -1,6 +1,8 @@
 mod core;
 pub(crate) mod csr;
 mod index;
+#[cfg(feature = "rayon")]
+mod parallel;
 mod view;
 
 pub use core::Topology;
