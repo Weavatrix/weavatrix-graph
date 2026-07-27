@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.6.0 - 2026-07-27
+
 - Add safe and opt-in `unsafe-fast` parallel dual-CSR builders with stable and
   unordered adjacency policies, automatic scale selection, Miri coverage, and
   reproducible 1M/10M/100M plus real-filesystem benchmarks.

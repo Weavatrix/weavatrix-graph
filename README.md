@@ -321,14 +321,14 @@ features for a real `no_std + alloc` build:
 
 ```toml
 [dependencies]
-weavatrix-graph = { version = "0.5", default-features = false }
+weavatrix-graph = { version = "0.6", default-features = false }
 ```
 
 Parallel batches are explicit and optional:
 
 ```toml
 [dependencies]
-weavatrix-graph = { version = "0.5", features = ["rayon"] }
+weavatrix-graph = { version = "0.6", features = ["rayon"] }
 ```
 
 Large topology construction can select a measured sequential/Rayon crossover
@@ -395,7 +395,7 @@ Bit-matrix lookup has an additional, separately auditable performance feature:
 
 ```toml
 [dependencies]
-weavatrix-graph = { version = "0.5", features = ["unsafe-fast"] }
+weavatrix-graph = { version = "0.6", features = ["unsafe-fast"] }
 ```
 
 The default `BitMatrix::contains` remains fully safe. With `unsafe-fast`,
