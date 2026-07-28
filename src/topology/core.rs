@@ -73,7 +73,8 @@ impl Topology {
         node_count: usize,
         edges: impl IntoIterator<Item = (usize, usize)>,
     ) -> Result<Self> {
-        let mut endpoints = Vec::new();
+        let edges = edges.into_iter();
+        let mut endpoints = Vec::with_capacity(edges.size_hint().0);
         for (source, target) in edges {
             endpoints.push(EdgeEndpoints::new(
                 compact_node(source)?,

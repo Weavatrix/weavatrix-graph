@@ -5,36 +5,69 @@ use alloc::collections::BTreeMap as NodeMap;
 #[cfg(feature = "std")]
 use std::collections::HashMap as NodeMap;
 
+/// Groups edges by source position, orders and deduplicates each group by
+/// `Edge` ordering, and returns the canonical edge list with its topology.
+///
+/// Edges are grouped by counting sort and ordered by sorting a permutation of
+/// indices, so each edge is moved exactly once and no per-source allocation is
+/// made. The resulting order is identical to sorting the edges themselves.
 pub(super) fn canonicalize_edges(
     nodes: &[Node],
     edges: Vec<Edge>,
 ) -> Result<(Vec<Edge>, Topology)> {
     let positions = node_positions(nodes);
-    let mut mapped = Vec::with_capacity(edges.len());
-    let mut counts = vec![0_usize; nodes.len()];
+    let count = edges.len();
+    let mut slots = Vec::with_capacity(count);
+    let mut targets = Vec::with_capacity(count);
+    let mut sources = Vec::with_capacity(count);
+    // One extra slot holds the total, so `starts[source..=source + 1]` bounds
+    // every group after the prefix sum.
+    let mut starts = vec![0_usize; nodes.len() + 1];
     for edge in edges {
         let source = position(&positions, &edge.source, true)?;
         let target = position(&positions, &edge.target, false)?;
-        counts[source] += 1;
-        mapped.push((source, edge, target));
+        sources.push(source);
+        targets.push(target);
+        starts[source + 1] += 1;
+        slots.push(Some(edge));
     }
-    let mut buckets = counts
-        .into_iter()
-        .map(Vec::with_capacity)
-        .collect::<Vec<Vec<(Edge, usize)>>>();
-    for (source, edge, target) in mapped {
-        buckets[source].push((edge, target));
+    for index in 0..nodes.len() {
+        starts[index + 1] += starts[index];
+    }
+    let mut order = vec![0_usize; count];
+    let mut cursors = starts.clone();
+    for (index, source) in sources.into_iter().enumerate() {
+        order[cursors[source]] = index;
+        cursors[source] += 1;
     }
 
-    let edge_count = buckets.iter().map(Vec::len).sum();
-    let mut canonical = Vec::with_capacity(edge_count);
-    let mut endpoints = Vec::with_capacity(edge_count);
-    for (source, mut bucket) in buckets.into_iter().enumerate() {
-        bucket.sort_unstable_by(|left, right| left.0.cmp(&right.0));
-        bucket.dedup_by(|left, right| left.0 == right.0);
-        for (edge, target) in bucket {
+    let mut canonical = Vec::with_capacity(count);
+    let mut endpoints = Vec::with_capacity(count);
+    let mut kept = Vec::new();
+    for source in 0..nodes.len() {
+        let group = &mut order[starts[source]..starts[source + 1]];
+        if group.is_empty() {
+            continue;
+        }
+        group.sort_unstable_by(|left, right| slots[*left].cmp(&slots[*right]));
+        // Ordering places equal edges next to each other, so one comparison
+        // per neighbour deduplicates the group.
+        kept.clear();
+        for index in group.iter().copied() {
+            if kept
+                .last()
+                .is_some_and(|previous: &usize| slots[*previous] == slots[index])
+            {
+                continue;
+            }
+            kept.push(index);
+        }
+        for index in kept.iter().copied() {
+            let Some(edge) = slots[index].take() else {
+                continue;
+            };
             canonical.push(edge);
-            endpoints.push((source, target));
+            endpoints.push((source, targets[index]));
         }
     }
     let topology = Topology::try_from_usize_edges(nodes.len(), endpoints)?;
@@ -71,6 +104,11 @@ pub(super) fn index_sorted_edges(nodes: &[Node], edges: &[Edge]) -> Result<Topol
     Topology::try_from_usize_edges(nodes.len(), endpoints)
 }
 
+/// Position lookup over the node list.
+///
+/// A hash index is measurably faster here than binary searching the sorted
+/// node list: identifiers are long shared-prefix strings, so each search costs
+/// a dozen string comparisons while a hash costs one pass over the bytes.
 fn node_positions(nodes: &[Node]) -> NodeMap<&NodeId, usize> {
     nodes
         .iter()
@@ -87,4 +125,77 @@ fn position(positions: &NodeMap<&NodeId, usize>, id: &NodeId, source: bool) -> R
             GraphError::MissingEdgeTarget { id: id.to_string() }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        Confidence, Edge, EdgeKind, EvidenceKind, Graph, Node, NodeId, NodeKind, Provenance,
+    };
+
+    fn node(id: &str) -> Node {
+        Node::new(id, id, NodeKind::File).unwrap()
+    }
+
+    fn edge(source: &str, target: &str, kind: EdgeKind, extractor: &str) -> Edge {
+        Edge::new(
+            NodeId::new(source).unwrap(),
+            NodeId::new(target).unwrap(),
+            kind,
+            Provenance::new(extractor, EvidenceKind::Parsed, Confidence::High).unwrap(),
+        )
+    }
+
+    /// The canonical order is a public contract: consumers persist snapshots
+    /// and diff them across builds. Scrambled input with duplicates must come
+    /// out in exactly the order the already-sorted path produces.
+    #[test]
+    fn canonical_order_matches_the_pre_sorted_path() {
+        let nodes = ["a", "b", "c"].map(node).to_vec();
+        let scrambled = vec![
+            edge("c", "a", EdgeKind::Calls, "second"),
+            edge("a", "c", EdgeKind::Imports, "first"),
+            edge("b", "a", EdgeKind::Calls, "first"),
+            edge("a", "b", EdgeKind::Calls, "first"),
+            edge("c", "a", EdgeKind::Calls, "first"),
+            // Exact duplicate of an earlier edge: canonicalization keeps one.
+            edge("a", "b", EdgeKind::Calls, "first"),
+            edge("a", "b", EdgeKind::Calls, "second"),
+        ];
+        let canonical = Graph::try_from_parts(nodes.clone(), scrambled.clone()).unwrap();
+
+        let mut expected = scrambled;
+        expected.sort();
+        expected.dedup();
+        let sorted = Graph::try_from_sorted_parts(nodes, expected).unwrap();
+
+        assert_eq!(
+            canonical.edges(),
+            sorted.edges(),
+            "canonicalization must agree with the already-sorted path"
+        );
+        assert_eq!(canonical.edge_count(), 6, "the duplicate edge is dropped");
+        assert_eq!(
+            canonical.edges().first().map(|edge| edge.source.as_str()),
+            Some("a"),
+            "edges are grouped by source position"
+        );
+    }
+
+    #[test]
+    fn dangling_endpoints_are_reported_by_side() {
+        let nodes = vec![node("a")];
+        let missing_source =
+            Graph::try_from_parts(nodes.clone(), vec![edge("z", "a", EdgeKind::Calls, "x")]);
+        assert!(
+            format!("{:?}", missing_source.unwrap_err()).contains("MissingEdgeSource"),
+            "an unknown source is reported as a missing source"
+        );
+        let missing_target =
+            Graph::try_from_parts(nodes, vec![edge("a", "z", EdgeKind::Calls, "x")]);
+        assert!(
+            format!("{:?}", missing_target.unwrap_err()).contains("MissingEdgeTarget"),
+            "an unknown target is reported as a missing target"
+        );
+    }
 }
