@@ -5,9 +5,13 @@ use crate::{GraphError, Result, StableEdgeKey, StableNodeKey};
 impl<NodePayload, EdgePayload> StableUndirectedPayloadGraph<NodePayload, EdgePayload> {
     pub fn remove_edge(&mut self, key: StableEdgeKey) -> Option<EdgePayload> {
         let endpoints = self.edge_endpoints(key)?;
-        self.unlink(endpoints.source(), key);
+        self.validate_unlink(endpoints.source(), key).ok()?;
         if endpoints.source() != endpoints.target() {
-            self.unlink(endpoints.target(), key);
+            self.validate_unlink(endpoints.target(), key).ok()?;
+        }
+        self.unlink(endpoints.source(), key).ok()?;
+        if endpoints.source() != endpoints.target() {
+            self.unlink(endpoints.target(), key).ok()?;
         }
         let payload = self.edge_slot_mut(key)?.value.take()?;
         self.edge_count -= 1;
@@ -45,9 +49,13 @@ impl<NodePayload, EdgePayload> StableUndirectedPayloadGraph<NodePayload, EdgePay
         if previous.source() == source && previous.target() == target {
             return Ok(true);
         }
-        self.unlink(previous.source(), key);
+        self.validate_unlink(previous.source(), key)?;
         if previous.source() != previous.target() {
-            self.unlink(previous.target(), key);
+            self.validate_unlink(previous.target(), key)?;
+        }
+        self.unlink(previous.source(), key)?;
+        if previous.source() != previous.target() {
+            self.unlink(previous.target(), key)?;
         }
         let edge = self
             .edge_slot_mut(key)
@@ -69,11 +77,12 @@ impl<NodePayload, EdgePayload> StableUndirectedPayloadGraph<NodePayload, EdgePay
         Ok(true)
     }
 
-    fn unlink(&mut self, node: StableNodeKey, edge: StableEdgeKey) {
+    fn unlink(&mut self, node: StableNodeKey, edge: StableEdgeKey) -> Result<()> {
+        self.validate_unlink(node, edge)?;
         let (previous, next) = {
-            let slot = self
-                .edge_slot(edge)
-                .expect("live incidence points to a live edge");
+            let Some(slot) = self.edge_slot(edge) else {
+                return Err(invalid_incidence(edge));
+            };
             (slot.previous(node.slot()), slot.next(node.slot()))
         };
         if previous == NONE_SLOT {
@@ -87,6 +96,33 @@ impl<NodePayload, EdgePayload> StableUndirectedPayloadGraph<NodePayload, EdgePay
             self.edges[next as usize].set_previous(node.slot(), previous);
         }
         self.nodes[node.index()].degree -= 1;
+        Ok(())
+    }
+
+    fn validate_unlink(&self, node: StableNodeKey, edge: StableEdgeKey) -> Result<()> {
+        let node_slot = self.node_slot(node).ok_or(GraphError::InvalidStableKey {
+            category: "undirected node",
+            slot: node.slot(),
+            generation: node.generation(),
+        })?;
+        let edge_slot = self
+            .edge_slot(edge)
+            .ok_or_else(|| invalid_incidence(edge))?;
+        if node_slot.degree == 0
+            || (edge_slot.source != node.slot() && edge_slot.target != node.slot())
+            || !self.live_incidence(edge_slot.previous(node.slot()), node.slot())
+            || !self.live_incidence(edge_slot.next(node.slot()), node.slot())
+        {
+            return Err(invalid_incidence(edge));
+        }
+        Ok(())
+    }
+
+    fn live_incidence(&self, edge: u32, node: u32) -> bool {
+        edge == NONE_SLOT
+            || self.edges.get(edge as usize).is_some_and(|slot| {
+                slot.value.is_some() && (slot.source == node || slot.target == node)
+            })
     }
 
     fn retire_node(&mut self, key: StableNodeKey) {
@@ -123,5 +159,13 @@ impl<NodePayload, EdgePayload> StableUndirectedPayloadGraph<NodePayload, EdgePay
         }
         self.nodes[node.index()].last_edge = edge.slot();
         self.nodes[node.index()].degree += 1;
+    }
+}
+
+fn invalid_incidence(edge: StableEdgeKey) -> GraphError {
+    GraphError::InvalidStableKey {
+        category: "undirected incidence edge",
+        slot: edge.slot(),
+        generation: edge.generation(),
     }
 }

@@ -102,11 +102,15 @@ where
         }
     }
     let candidate = working.solve(&nodes)?;
-    Ok(candidate.map(|cut| StoerWagnerCut {
-        weight: cut.weight,
-        partition: map_nodes(&cut.partition, &nodes_by_slot),
-        complement: map_nodes(&cut.complement, &nodes_by_slot),
-    }))
+    candidate
+        .map(|cut| {
+            Ok(StoerWagnerCut {
+                weight: cut.weight,
+                partition: map_nodes(&cut.partition, &nodes_by_slot)?,
+                complement: map_nodes(&cut.complement, &nodes_by_slot)?,
+            })
+        })
+        .transpose()
 }
 
 impl<M: Measure> WorkingCut<M> {
@@ -172,9 +176,12 @@ impl<M: Measure> WorkingCut<M> {
         }
         let mut previous = None;
         for index in 0..self.active_count {
-            let (node, weight) = pop_current(queue, &self.active, added, weights);
+            let (node, weight) = pop_current(queue, &self.active, added, weights)
+                .ok_or_else(|| invalid_phase_state("no queued active node remains"))?;
             if index + 1 == self.active_count {
-                return Ok((previous.expect("phase has two nodes"), node, weight));
+                let source = previous
+                    .ok_or_else(|| invalid_phase_state("phase has fewer than two nodes"))?;
+                return Ok((source, node, weight));
             }
             added[node] = true;
             previous = Some(node);
@@ -189,7 +196,7 @@ impl<M: Measure> WorkingCut<M> {
                 }
             }
         }
-        unreachable!("active phase always selects a target")
+        Err(invalid_phase_state("phase selected no target"))
     }
 
     fn merge(&mut self, source: usize, target: usize) -> Result<()> {
@@ -225,11 +232,27 @@ fn pop_current<M: Measure>(
     active: &[bool],
     added: &[bool],
     weights: &[M],
-) -> (usize, M) {
+) -> Option<(usize, M)> {
     while let Some((node, weight)) = queue.pop() {
-        if active[node] && !added[node] && weight.compare(weights[node]) == Some(Ordering::Equal) {
-            return (node, weight);
+        let Some((&is_active, &is_added, &current_weight)) = active
+            .get(node)
+            .zip(added.get(node))
+            .zip(weights.get(node))
+            .map(|((active, added), weight)| (active, added, weight))
+        else {
+            continue;
+        };
+        if is_active && !is_added && weight.compare(current_weight) == Some(Ordering::Equal) {
+            return Some((node, weight));
         }
     }
-    unreachable!("every active node is queued")
+    None
+}
+
+fn invalid_phase_state(value: &'static str) -> GraphError {
+    GraphError::InvalidAlgorithmParameter {
+        algorithm: "Stoer-Wagner",
+        parameter: "active cut state",
+        value: value.into(),
+    }
 }

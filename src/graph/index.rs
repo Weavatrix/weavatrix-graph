@@ -130,44 +130,48 @@ fn position(positions: &NodeMap<&NodeId, usize>, id: &NodeId, source: bool) -> R
 #[cfg(test)]
 mod tests {
     use crate::{
-        Confidence, Edge, EdgeKind, EvidenceKind, Graph, Node, NodeId, NodeKind, Provenance,
+        Confidence, Edge, EdgeKind, EvidenceKind, Graph, GraphError, Node, NodeId, NodeKind,
+        Provenance, Result, Vec,
     };
 
-    fn node(id: &str) -> Node {
-        Node::new(id, id, NodeKind::File).unwrap()
+    fn node(id: &str) -> Result<Node> {
+        Node::new(id, id, NodeKind::File)
     }
 
-    fn edge(source: &str, target: &str, kind: EdgeKind, extractor: &str) -> Edge {
-        Edge::new(
-            NodeId::new(source).unwrap(),
-            NodeId::new(target).unwrap(),
+    fn edge(source: &str, target: &str, kind: EdgeKind, extractor: &str) -> Result<Edge> {
+        Ok(Edge::new(
+            NodeId::new(source)?,
+            NodeId::new(target)?,
             kind,
-            Provenance::new(extractor, EvidenceKind::Parsed, Confidence::High).unwrap(),
-        )
+            Provenance::new(extractor, EvidenceKind::Parsed, Confidence::High)?,
+        ))
     }
 
     /// The canonical order is a public contract: consumers persist snapshots
     /// and diff them across builds. Scrambled input with duplicates must come
     /// out in exactly the order the already-sorted path produces.
     #[test]
-    fn canonical_order_matches_the_pre_sorted_path() {
-        let nodes = ["a", "b", "c"].map(node).to_vec();
+    fn canonical_order_matches_the_pre_sorted_path() -> Result<()> {
+        let nodes = ["a", "b", "c"]
+            .map(node)
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?;
         let scrambled = vec![
-            edge("c", "a", EdgeKind::Calls, "second"),
-            edge("a", "c", EdgeKind::Imports, "first"),
-            edge("b", "a", EdgeKind::Calls, "first"),
-            edge("a", "b", EdgeKind::Calls, "first"),
-            edge("c", "a", EdgeKind::Calls, "first"),
+            edge("c", "a", EdgeKind::Calls, "second")?,
+            edge("a", "c", EdgeKind::Imports, "first")?,
+            edge("b", "a", EdgeKind::Calls, "first")?,
+            edge("a", "b", EdgeKind::Calls, "first")?,
+            edge("c", "a", EdgeKind::Calls, "first")?,
             // Exact duplicate of an earlier edge: canonicalization keeps one.
-            edge("a", "b", EdgeKind::Calls, "first"),
-            edge("a", "b", EdgeKind::Calls, "second"),
+            edge("a", "b", EdgeKind::Calls, "first")?,
+            edge("a", "b", EdgeKind::Calls, "second")?,
         ];
-        let canonical = Graph::try_from_parts(nodes.clone(), scrambled.clone()).unwrap();
+        let canonical = Graph::try_from_parts(nodes.clone(), scrambled.clone())?;
 
         let mut expected = scrambled;
         expected.sort();
         expected.dedup();
-        let sorted = Graph::try_from_sorted_parts(nodes, expected).unwrap();
+        let sorted = Graph::try_from_sorted_parts(nodes, expected)?;
 
         assert_eq!(
             canonical.edges(),
@@ -180,22 +184,24 @@ mod tests {
             Some("a"),
             "edges are grouped by source position"
         );
+        Ok(())
     }
 
     #[test]
-    fn dangling_endpoints_are_reported_by_side() {
-        let nodes = vec![node("a")];
+    fn dangling_endpoints_are_reported_by_side() -> Result<()> {
+        let nodes = vec![node("a")?];
         let missing_source =
-            Graph::try_from_parts(nodes.clone(), vec![edge("z", "a", EdgeKind::Calls, "x")]);
+            Graph::try_from_parts(nodes.clone(), vec![edge("z", "a", EdgeKind::Calls, "x")?]);
         assert!(
-            format!("{:?}", missing_source.unwrap_err()).contains("MissingEdgeSource"),
+            matches!(missing_source, Err(GraphError::MissingEdgeSource { .. })),
             "an unknown source is reported as a missing source"
         );
         let missing_target =
-            Graph::try_from_parts(nodes, vec![edge("a", "z", EdgeKind::Calls, "x")]);
+            Graph::try_from_parts(nodes, vec![edge("a", "z", EdgeKind::Calls, "x")?]);
         assert!(
-            format!("{:?}", missing_target.unwrap_err()).contains("MissingEdgeTarget"),
+            matches!(missing_target, Err(GraphError::MissingEdgeTarget { .. })),
             "an unknown target is reported as a missing target"
         );
+        Ok(())
     }
 }

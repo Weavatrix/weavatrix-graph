@@ -140,7 +140,7 @@ where
                 .filter_map(|predecessor| position[G::node_slot(*predecessor)])
                 .filter(|predecessor| immediate[*predecessor].is_some())
             {
-                new_idom = intersect(predecessor, new_idom, &immediate);
+                new_idom = intersect(predecessor, new_idom, &immediate)?;
             }
             if immediate[index] != Some(new_idom) {
                 immediate[index] = Some(new_idom);
@@ -202,14 +202,14 @@ where
     order
 }
 
-fn intersect(mut left: usize, mut right: usize, immediate: &[Option<usize>]) -> usize {
+fn intersect(mut left: usize, mut right: usize, immediate: &[Option<usize>]) -> Option<usize> {
     while left != right {
         while left > right {
-            left = immediate[left].expect("processed dominator");
+            left = immediate.get(left).copied().flatten()?;
         }
         while right > left {
-            right = immediate[right].expect("processed dominator");
+            right = immediate.get(right).copied().flatten()?;
         }
     }
-    left
+    Some(left)
 }

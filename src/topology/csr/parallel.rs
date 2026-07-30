@@ -17,15 +17,19 @@ pub(super) fn try_build_pair(
         .par_iter()
         .copied()
         .enumerate()
-        .for_each(|(edge, endpoints)| {
+        .try_for_each(|(edge, endpoints)| -> Result<()> {
+            let edge = u32::try_from(edge).map_err(|_| GraphError::IndexCapacityExceeded {
+                category: "edge index",
+                count: edge,
+            })?;
             let outgoing = outgoing_cursors[endpoints.source().index()]
                 .fetch_add(1, Ordering::Relaxed) as usize;
             let incoming = incoming_cursors[endpoints.target().index()]
                 .fetch_add(1, Ordering::Relaxed) as usize;
-            let edge = u32::try_from(edge).expect("edge count was checked");
             outgoing_slots[outgoing].store(edge, Ordering::Relaxed);
             incoming_slots[incoming].store(edge, Ordering::Relaxed);
-        });
+            Ok(())
+        })?;
     let (mut outgoing_edges, mut incoming_edges) =
         rayon::join(|| into_edges(outgoing_slots), || into_edges(incoming_slots));
     let (outgoing_offsets, incoming_offsets) = rayon::join(

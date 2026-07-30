@@ -2,7 +2,7 @@
 
 use super::parallel::count_cursors;
 use super::{Csr, sort_adjacencies};
-use crate::{EdgeEndpoints, EdgeIndex, Result, Vec};
+use crate::{EdgeEndpoints, EdgeIndex, GraphError, Result, Vec};
 use rayon::prelude::*;
 use std::{
     mem::ManuallyDrop,
@@ -23,18 +23,23 @@ pub(super) fn try_build_pair(
         .par_iter()
         .copied()
         .enumerate()
-        .for_each(|(edge, endpoints)| {
+        .try_for_each(|(edge, endpoints)| -> Result<()> {
+            let edge = u32::try_from(edge).map_err(|_| GraphError::IndexCapacityExceeded {
+                category: "edge index",
+                count: edge,
+            })?;
             let outgoing = outgoing_cursors[endpoints.source().index()]
                 .fetch_add(1, Ordering::Relaxed) as usize;
             let incoming = incoming_cursors[endpoints.target().index()]
                 .fetch_add(1, Ordering::Relaxed) as usize;
-            let edge = EdgeIndex::new(u32::try_from(edge).expect("edge count was checked"));
+            let edge = EdgeIndex::new(edge);
             // SAFETY: each fetch_add returns a unique in-capacity slot.
             unsafe {
                 outgoing_slots.write(outgoing, edge);
                 incoming_slots.write(incoming, edge);
             }
-        });
+            Ok(())
+        })?;
     // SAFETY: the parallel loop initialized every allocated slot exactly once.
     unsafe {
         outgoing_edges.set_len(endpoints.len());
@@ -63,8 +68,9 @@ pub(super) fn try_build_pair(
 }
 
 fn into_offsets_fast(cursors: Vec<AtomicU32>) -> Vec<u32> {
-    assert_eq!(size_of::<AtomicU32>(), size_of::<u32>());
-    assert_eq!(align_of::<AtomicU32>(), align_of::<u32>());
+    if size_of::<AtomicU32>() != size_of::<u32>() || align_of::<AtomicU32>() != align_of::<u32>() {
+        return super::parallel::into_offsets(cursors);
+    }
     let mut cursors = ManuallyDrop::new(cursors);
     let (pointer, length, capacity) = (
         cursors.as_mut_ptr().cast::<u32>(),
@@ -100,10 +106,10 @@ mod tests {
     fn direct_write_and_cursor_reuse_preserve_layout() {
         let mut edges = Vec::<EdgeIndex>::with_capacity(3);
         let slots = SharedSlots(edges.as_mut_ptr());
-        for index in 0..3 {
+        for (index, edge) in [0, 1, 2].into_iter().enumerate() {
             // SAFETY: each in-capacity slot is written exactly once.
             unsafe {
-                slots.write(index, EdgeIndex::new(u32::try_from(index).unwrap()));
+                slots.write(index, EdgeIndex::new(edge));
             }
         }
         // SAFETY: all three allocated slots were initialized above.

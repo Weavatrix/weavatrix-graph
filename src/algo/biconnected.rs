@@ -124,27 +124,26 @@ where
     fn search_from(&mut self, graph: &G, root: G::Node) {
         self.discover(root);
         let mut frames = vec![Self::frame(graph, root, None)];
-        while !frames.is_empty() {
+        while let Some(frame) = frames.last_mut() {
             let next = {
-                let frame = frames.last_mut().expect("non-empty DFS stack");
                 if frame.next == frame.degree {
                     None
                 } else {
-                    let edge = graph
-                        .incident_edge_at(frame.node, frame.next)
-                        .expect("offset is inside incident edge range");
+                    let edge = graph.incident_edge_at(frame.node, frame.next);
                     frame.next += 1;
-                    Some((frame.node, frame.parent_edge, edge))
+                    edge.map(|edge| (frame.node, frame.parent_edge, edge))
                 }
             };
             if let Some((node, parent_edge, edge)) = next {
                 self.explore_edge(graph, &mut frames, node, parent_edge, edge);
             } else {
-                let frame = frames.pop().expect("non-empty DFS stack");
+                let Some(frame) = frames.pop() else {
+                    break;
+                };
                 self.finish_frame(frames.last_mut(), &frame);
             }
         }
-        debug_assert!(self.edge_stack.is_empty());
+        self.edge_stack.clear();
     }
 
     fn explore_edge(
@@ -176,7 +175,10 @@ where
         let slot = G::node_slot(node);
         let neighbor_slot = G::node_slot(neighbor);
         if self.discovery[neighbor_slot] == usize::MAX {
-            frames.last_mut().expect("parent frame").children += 1;
+            let Some(parent) = frames.last_mut() else {
+                return;
+            };
+            parent.children += 1;
             self.edge_stack.push(edge);
             self.discover(neighbor);
             frames.push(Self::frame(graph, neighbor, Some(edge)));
@@ -198,7 +200,9 @@ where
             }
             return;
         };
-        let parent = parent.expect("non-root frame has parent");
+        let Some(parent) = parent else {
+            return;
+        };
         let parent_slot = G::node_slot(parent.node);
         self.low[parent_slot] = self.low[parent_slot].min(self.low[slot]);
         let parent_discovery = self.discovery[parent_slot];

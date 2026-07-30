@@ -23,25 +23,24 @@ impl AdaptivePackedU32 {
             + words * size_of::<u64>()
     }
 
-    pub(super) fn from_values(values: &[u32]) -> Self {
+    pub(super) fn try_from_values(values: &[u32]) -> Option<Self> {
         let blocks = values.len().div_ceil(BLOCK_LEN);
         let mut bases = Vec::with_capacity(blocks);
-        let mut word_offsets = Vec::with_capacity(blocks + 1);
+        let mut word_offsets = Vec::<u32>::with_capacity(blocks + 1);
         let mut widths = Vec::with_capacity(blocks);
         word_offsets.push(0);
         for block in values.chunks(BLOCK_LEN) {
-            let (&minimum, &maximum) = (
-                block.iter().min().expect("block is non-empty"),
-                block.iter().max().expect("block is non-empty"),
-            );
+            let minimum = block.iter().min().copied()?;
+            let maximum = block.iter().max().copied()?;
             let bits = value_bits(maximum - minimum);
             bases.push(minimum);
             widths.push(bits);
-            let next = word_offsets.last().copied().unwrap_or(0)
-                + u32::try_from(words_for(block.len(), bits)).expect("word count fits u32");
+            let words = u32::try_from(words_for(block.len(), bits)).ok()?;
+            let next = word_offsets.last().copied()?.checked_add(words)?;
             word_offsets.push(next);
         }
-        let mut words = vec![0_u64; word_offsets.last().copied().unwrap_or(0) as usize];
+        let word_count = word_offsets.last().copied()?;
+        let mut words = vec![0_u64; word_count as usize];
         for (block_index, values) in values.chunks(BLOCK_LEN).enumerate() {
             let start = word_offsets[block_index] as usize;
             let end = word_offsets[block_index + 1] as usize;
@@ -52,13 +51,13 @@ impl AdaptivePackedU32 {
                 widths[block_index],
             );
         }
-        Self {
+        Some(Self {
             bases,
             word_offsets,
             widths,
             words,
             len: values.len(),
-        }
+        })
     }
 
     #[inline]
@@ -131,7 +130,7 @@ fn read(words: &[u64], bit: usize, bits: u8) -> u32 {
     if offset + usize::from(bits) > 64 {
         value |= words[word + 1] << (64 - offset);
     }
-    u32::try_from(value & mask(bits)).expect("packed value is at most 32 bits")
+    u32::try_from(value & mask(bits)).unwrap_or(u32::MAX)
 }
 
 fn block_width(values: &[u32]) -> u8 {
@@ -142,7 +141,7 @@ fn block_width(values: &[u32]) -> u8 {
 }
 
 fn value_bits(maximum: u32) -> u8 {
-    u8::try_from(u32::BITS - maximum.leading_zeros()).expect("u32 width fits u8")
+    u8::try_from(u32::BITS - maximum.leading_zeros()).unwrap_or(32)
 }
 
 fn words_for(values: usize, bits: u8) -> usize {

@@ -37,7 +37,7 @@ impl<M: Measure> MaxQueue<M> {
 
     pub(super) fn pop(&mut self) -> Option<(usize, M)> {
         let root = *self.heap.first()?;
-        let last = self.heap.pop().expect("nonempty heap");
+        let last = self.heap.pop()?;
         if !self.heap.is_empty() {
             self.heap[0] = last;
             let mut parent = 0;

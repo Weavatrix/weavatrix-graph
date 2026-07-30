@@ -185,7 +185,8 @@ impl GraphView for Topology {
     }
 
     fn edge_indices(&self) -> impl Iterator<Item = Self::Edge> + '_ {
-        (0..u32::try_from(self.edge_count()).expect("edge count was checked")).map(EdgeIndex::new)
+        let edge_count = u32::try_from(self.edge_count()).unwrap_or(u32::MAX);
+        (0..edge_count).map(EdgeIndex::new)
     }
 
     fn edge_endpoints(&self, edge: EdgeIndex) -> Option<EdgeEndpoints> {

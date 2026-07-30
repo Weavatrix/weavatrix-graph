@@ -3,7 +3,7 @@ use super::search::shortest_residual_path;
 use super::{Predecessors, Step};
 use crate::algo::flow::common::prepare;
 use crate::algo::flow::cut::indexed_nodes;
-use crate::{GraphError, IndexGraphView, Result};
+use crate::{GraphError, IndexGraphView, Result, String};
 
 /// Computes a maximum flow of minimum cost with successive shortest paths.
 ///
@@ -55,7 +55,7 @@ where
             &predecessors,
             &input.capacities,
             &flows,
-        );
+        )?;
         let path_cost = apply::<G>(
             source_slot,
             sink_slot,
@@ -90,22 +90,35 @@ fn bottleneck<G>(
     predecessors: &Predecessors<G::Edge>,
     capacities: &[u64],
     flows: &[u64],
-) -> u64
+) -> Result<u64>
 where
     G: IndexGraphView,
 {
     let mut amount = u64::MAX;
+    let mut remaining = predecessors.len();
     while cursor != source {
-        let step = predecessors[cursor].expect("sink has a residual predecessor");
+        if remaining == 0 {
+            return Err(invalid_residual_path());
+        }
+        remaining -= 1;
+        let step = predecessors
+            .get(cursor)
+            .copied()
+            .flatten()
+            .ok_or_else(invalid_residual_path)?;
         let slot = G::edge_slot(step.edge);
         amount = amount.min(if step.forward {
-            capacities[slot] - flows[slot]
+            capacities
+                .get(slot)
+                .zip(flows.get(slot))
+                .and_then(|(capacity, flow)| capacity.checked_sub(*flow))
+                .ok_or_else(invalid_residual_path)?
         } else {
-            flows[slot]
+            *flows.get(slot).ok_or_else(invalid_residual_path)?
         });
         cursor = step.previous;
     }
-    amount
+    Ok(amount)
 }
 
 fn apply<G>(
@@ -120,19 +133,30 @@ where
     G: IndexGraphView,
 {
     let mut cost = 0_i128;
+    let mut remaining = predecessors.len();
     while cursor != source {
+        if remaining == 0 {
+            return Err(invalid_residual_path());
+        }
+        remaining -= 1;
         let Step {
             previous,
             edge,
             forward,
-        } = predecessors[cursor].expect("sink has a residual predecessor");
+        } = predecessors
+            .get(cursor)
+            .copied()
+            .flatten()
+            .ok_or_else(invalid_residual_path)?;
         let slot = G::edge_slot(edge);
+        let edge_cost = *costs.get(slot).ok_or_else(invalid_residual_path)?;
+        let flow = flows.get_mut(slot).ok_or_else(invalid_residual_path)?;
         cost = if forward {
-            flows[slot] += amount;
-            cost.checked_add(i128::from(costs[slot]))
+            *flow = flow.checked_add(amount).ok_or_else(invalid_residual_path)?;
+            cost.checked_add(i128::from(edge_cost))
         } else {
-            flows[slot] -= amount;
-            cost.checked_sub(i128::from(costs[slot]))
+            *flow = flow.checked_sub(amount).ok_or_else(invalid_residual_path)?;
+            cost.checked_sub(i128::from(edge_cost))
         }
         .ok_or(GraphError::ArithmeticOverflow {
             operation: "minimum-cost path sum",
@@ -140,4 +164,12 @@ where
         cursor = previous;
     }
     Ok(cost)
+}
+
+fn invalid_residual_path() -> GraphError {
+    GraphError::InvalidAlgorithmParameter {
+        algorithm: "minimum-cost maximum flow",
+        parameter: "residual predecessor path",
+        value: String::from("path is incomplete or inconsistent"),
+    }
 }

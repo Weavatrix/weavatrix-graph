@@ -59,10 +59,18 @@ pub(super) fn nodes<G: IndexUndirectedGraphView>(graph: &G) -> (Vec<Option<G::No
     (by_slot, slots)
 }
 
-pub(super) fn map_nodes<Node: Copy>(slots: &[usize], nodes: &[Option<Node>]) -> Vec<Node> {
+pub(super) fn map_nodes<Node: Copy>(slots: &[usize], nodes: &[Option<Node>]) -> Result<Vec<Node>> {
     slots
         .iter()
-        .map(|&slot| nodes[slot].expect("active slot has a node"))
+        .map(|&slot| {
+            nodes.get(slot).copied().flatten().ok_or_else(|| {
+                GraphError::InvalidAlgorithmParameter {
+                    algorithm: "Stoer-Wagner",
+                    parameter: "active node mapping",
+                    value: String::from("active slot has no corresponding graph node"),
+                }
+            })
+        })
         .collect()
 }
 

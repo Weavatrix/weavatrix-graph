@@ -42,7 +42,7 @@ where
             offsets[slot] += offsets[slot - 1];
         }
         let mut cursors = offsets[..graph.node_bound()].to_vec();
-        let mut neighbors = vec![None; *offsets.last().expect("offset sentinel")];
+        let mut neighbors = vec![None; offsets.last().copied().unwrap_or_default()];
         for edge in graph.edge_indices() {
             if !allowed[G::edge_slot(edge)] {
                 continue;
@@ -59,13 +59,17 @@ where
                 cursors[target] += 1;
             }
         }
+        let Some(neighbors) = neighbors.into_iter().collect::<Option<Vec<_>>>() else {
+            return Self {
+                nodes,
+                offsets: vec![0; graph.node_bound() + 1],
+                neighbors: Vec::new(),
+            };
+        };
         Self {
             nodes,
             offsets,
-            neighbors: neighbors
-                .into_iter()
-                .map(|node| node.expect("counted neighbor is populated"))
-                .collect(),
+            neighbors,
         }
     }
 

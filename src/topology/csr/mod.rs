@@ -44,7 +44,7 @@ impl Csr {
         let mut outgoing_edges = vec![EdgeIndex::new(0); endpoints.len()];
         let mut incoming_edges = vec![EdgeIndex::new(0); endpoints.len()];
         for (edge, &endpoints) in endpoints.iter().enumerate() {
-            let edge = EdgeIndex::new(u32::try_from(edge).expect("edge count was checked"));
+            let edge = compact_edge(edge)?;
             place(
                 &mut outgoing_edges,
                 &mut outgoing_counts,
@@ -131,7 +131,7 @@ impl Csr {
         counts.copy_from_slice(&offsets[..node_count]);
         let mut edges = vec![EdgeIndex::new(0); total];
         for (edge, endpoints) in endpoints.iter().copied().enumerate() {
-            let edge = EdgeIndex::new(u32::try_from(edge).expect("edge count was checked"));
+            let edge = compact_edge(edge)?;
             place(&mut edges, &mut counts, endpoints.source().index(), edge);
             if endpoints.source() != endpoints.target() {
                 place(&mut edges, &mut counts, endpoints.target().index(), edge);
@@ -204,6 +204,15 @@ fn increment(
             count: usize::MAX,
         })?;
     Ok(())
+}
+
+fn compact_edge(index: usize) -> Result<EdgeIndex> {
+    u32::try_from(index)
+        .map(EdgeIndex::new)
+        .map_err(|_| GraphError::IndexCapacityExceeded {
+            category: "edge index",
+            count: index,
+        })
 }
 
 fn place(edges: &mut [EdgeIndex], cursors: &mut [u32], node: usize, edge: EdgeIndex) {

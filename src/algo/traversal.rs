@@ -134,7 +134,7 @@ where
     queue.push_back(source);
     while let Some(node) = queue.pop_front() {
         if node == target {
-            return Some(reconstruct_path::<G>(source, target, &predecessor));
+            return reconstruct_path::<G>(source, target, &predecessor);
         }
         for_each_neighbor(graph, node, direction, &mut keep_edge, |neighbor| {
             let slot = G::node_slot(neighbor);
@@ -152,15 +152,18 @@ fn reconstruct_path<G: IndexGraphView>(
     source: G::Node,
     target: G::Node,
     predecessor: &[Option<G::Node>],
-) -> Vec<G::Node> {
+) -> Option<Vec<G::Node>> {
     let mut path = vec![target];
     let mut cursor = target;
     while cursor != source {
-        cursor = predecessor[G::node_slot(cursor)].expect("visited nodes have predecessors");
+        if path.len() > predecessor.len() {
+            return None;
+        }
+        cursor = predecessor.get(G::node_slot(cursor)).copied().flatten()?;
         path.push(cursor);
     }
     path.reverse();
-    path
+    Some(path)
 }
 
 pub(super) fn for_each_neighbor<G, F, V>(

@@ -31,7 +31,7 @@ impl EliasFano {
                 samples.push(position);
             }
         }
-        let low_bits = u8::try_from(low_bits).expect("u32 width fits u8");
+        let low_bits = u8::try_from(low_bits).unwrap_or(32);
         Self {
             low: PackedU32::from_values(&low_values, low_bits),
             high,
@@ -46,8 +46,7 @@ impl EliasFano {
         debug_assert!(index < self.len);
         let position = self.select(index);
         let upper = (position - index) as u64;
-        u32::try_from((upper << self.low_bits) | u64::from(self.low.get(index)))
-            .expect("decoded offset originated as u32")
+        u32::try_from((upper << self.low_bits) | u64::from(self.low.get(index))).unwrap_or(u32::MAX)
     }
 
     pub(super) fn storage_bytes(&self) -> usize {

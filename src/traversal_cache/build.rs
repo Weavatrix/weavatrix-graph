@@ -24,7 +24,7 @@ pub(super) fn build_neighbor_pair(
 
 pub(super) fn neighbor_bits(node_count: usize) -> u8 {
     let maximum = u32::try_from(node_count.saturating_sub(1)).unwrap_or(u32::MAX);
-    u8::try_from((u32::BITS - maximum.leading_zeros()).max(1)).expect("u32 width fits u8")
+    u8::try_from((u32::BITS - maximum.leading_zeros()).max(1)).unwrap_or(32)
 }
 
 pub(super) fn select_storage(

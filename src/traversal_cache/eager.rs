@@ -43,12 +43,19 @@ fn bfs_adjacency(adjacency: &NeighborCsr, workspace: &mut TraversalCacheWorkspac
         (OffsetStorage::EliasFano(offsets), NeighborStorage::Adaptive(neighbors)) => {
             bfs_adaptive(offsets, neighbors, workspace);
         }
-        (OffsetStorage::Direct(_), NeighborStorage::Adaptive(_)) => {
-            unreachable!("adaptive neighbors are reserved for compact storage");
+        (OffsetStorage::Direct(_), NeighborStorage::Adaptive(_))
+        | (OffsetStorage::EliasFano(_), NeighborStorage::Direct(_)) => {
+            bfs_flexible(adjacency, workspace);
         }
-        (OffsetStorage::EliasFano(_), NeighborStorage::Direct(_)) => {
-            unreachable!("direct neighbors always use direct offsets");
-        }
+    }
+}
+
+fn bfs_flexible(adjacency: &NeighborCsr, workspace: &mut TraversalCacheWorkspace) {
+    let mut cursor = 0;
+    while cursor < workspace.visited.len() {
+        let node = workspace.visited[cursor];
+        cursor += 1;
+        append_adjacency(adjacency, node, workspace);
     }
 }
 

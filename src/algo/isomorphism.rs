@@ -157,15 +157,20 @@ fn search<P, T, N, E>(
         return;
     }
     if depth == pattern_nodes.len() {
-        let mut mapping = pattern_nodes
+        let mapping = pattern_nodes
             .iter()
             .map(|node| {
-                (
-                    *node,
-                    state.mapping[P::node_slot(*node)].expect("complete mapping"),
-                )
+                state
+                    .mapping
+                    .get(P::node_slot(*node))
+                    .copied()
+                    .flatten()
+                    .map(|target| (*node, target))
             })
-            .collect::<Vec<_>>();
+            .collect::<Option<Vec<_>>>();
+        let Some(mut mapping) = mapping else {
+            return;
+        };
         mapping.sort_unstable_by_key(|(node, _)| P::node_slot(*node));
         state.results.push(mapping);
         return;

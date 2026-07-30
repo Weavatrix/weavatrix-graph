@@ -45,7 +45,7 @@ where
         }
 
         let mut cursors = offsets[..graph.node_bound()].to_vec();
-        let mut incident = vec![None; *offsets.last().expect("offset sentinel")];
+        let mut incident = vec![None; offsets.last().copied().unwrap_or_default()];
         for edge in graph.edge_indices() {
             if !allowed[G::edge_slot(edge)] {
                 continue;
@@ -62,10 +62,13 @@ where
                 cursors[target] += 1;
             }
         }
-        let mut edges = incident
-            .into_iter()
-            .map(|edge| edge.expect("counted incident edge is populated"))
-            .collect::<Vec<_>>();
+        let Some(mut edges) = incident.into_iter().collect::<Option<Vec<_>>>() else {
+            return Self {
+                nodes,
+                offsets: vec![0; graph.node_bound() + 1],
+                edges: Vec::new(),
+            };
+        };
         for range in offsets.windows(2) {
             edges[range[0]..range[1]].sort_unstable_by_key(|edge| G::edge_slot(*edge));
         }

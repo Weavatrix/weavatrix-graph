@@ -1,7 +1,7 @@
 use super::MaxFlow;
 use super::common::{finish, prepare, zero};
 use super::cut::indexed_nodes;
-use crate::{GraphError, IndexGraphView, Result, Vec};
+use crate::{GraphError, IndexGraphView, Result, String, Vec};
 use alloc::collections::VecDeque;
 
 #[derive(Clone, Copy)]
@@ -52,8 +52,8 @@ where
             &predecessors,
             &input.capacities,
             &flows,
-        );
-        apply::<G>(source_slot, sink_slot, amount, &predecessors, &mut flows);
+        )?;
+        apply::<G>(source_slot, sink_slot, amount, &predecessors, &mut flows)?;
         total = total
             .checked_add(amount)
             .ok_or(GraphError::ArithmeticOverflow {
@@ -152,22 +152,35 @@ fn bottleneck<G>(
     predecessors: &[Option<Step<G::Edge>>],
     capacities: &[u64],
     flows: &[u64],
-) -> u64
+) -> Result<u64>
 where
     G: IndexGraphView,
 {
     let mut amount = u64::MAX;
+    let mut remaining = predecessors.len();
     while cursor != source {
-        let step = predecessors[cursor].expect("sink is connected to source");
+        if remaining == 0 {
+            return Err(invalid_residual_path());
+        }
+        remaining -= 1;
+        let step = predecessors
+            .get(cursor)
+            .copied()
+            .flatten()
+            .ok_or_else(invalid_residual_path)?;
         let slot = G::edge_slot(step.edge);
         amount = amount.min(if step.forward {
-            capacities[slot] - flows[slot]
+            capacities
+                .get(slot)
+                .zip(flows.get(slot))
+                .and_then(|(capacity, flow)| capacity.checked_sub(*flow))
+                .ok_or_else(invalid_residual_path)?
         } else {
-            flows[slot]
+            *flows.get(slot).ok_or_else(invalid_residual_path)?
         });
         cursor = step.previous;
     }
-    amount
+    Ok(amount)
 }
 
 fn apply<G>(
@@ -176,17 +189,37 @@ fn apply<G>(
     amount: u64,
     predecessors: &[Option<Step<G::Edge>>],
     flows: &mut [u64],
-) where
+) -> Result<()>
+where
     G: IndexGraphView,
 {
+    let mut remaining = predecessors.len();
     while cursor != source {
-        let step = predecessors[cursor].expect("sink is connected to source");
+        if remaining == 0 {
+            return Err(invalid_residual_path());
+        }
+        remaining -= 1;
+        let step = predecessors
+            .get(cursor)
+            .copied()
+            .flatten()
+            .ok_or_else(invalid_residual_path)?;
         let slot = G::edge_slot(step.edge);
+        let flow = flows.get_mut(slot).ok_or_else(invalid_residual_path)?;
         if step.forward {
-            flows[slot] += amount;
+            *flow = flow.checked_add(amount).ok_or_else(invalid_residual_path)?;
         } else {
-            flows[slot] -= amount;
+            *flow = flow.checked_sub(amount).ok_or_else(invalid_residual_path)?;
         }
         cursor = step.previous;
+    }
+    Ok(())
+}
+
+fn invalid_residual_path() -> GraphError {
+    GraphError::InvalidAlgorithmParameter {
+        algorithm: "Edmonds-Karp",
+        parameter: "residual predecessor path",
+        value: String::from("path is incomplete or inconsistent"),
     }
 }

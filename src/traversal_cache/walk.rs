@@ -202,7 +202,7 @@ impl TraversalCache {
         workspace.queue.push_back(source);
         while let Some(node) = workspace.queue.pop_front() {
             if node == target {
-                return Some(reconstruct(source, target, &workspace.predecessor));
+                return reconstruct(source, target, &workspace.predecessor);
             }
             for_each_neighbor(self, node, direction, |neighbor| {
                 if workspace.mark(neighbor) {
@@ -233,13 +233,16 @@ fn reconstruct(
     source: NodeIndex,
     target: NodeIndex,
     predecessor: &[Option<NodeIndex>],
-) -> Vec<NodeIndex> {
+) -> Option<Vec<NodeIndex>> {
     let mut path = vec![target];
     let mut cursor = target;
     while cursor != source {
-        cursor = predecessor[cursor.index()].expect("visited nodes have predecessors");
+        if path.len() > predecessor.len() {
+            return None;
+        }
+        cursor = predecessor.get(cursor.index()).copied().flatten()?;
         path.push(cursor);
     }
     path.reverse();
-    path
+    Some(path)
 }

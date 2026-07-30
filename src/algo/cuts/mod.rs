@@ -74,8 +74,9 @@ where
     G: IndexUndirectedGraphView,
 {
     let slot = G::node_slot(node);
-    state.discovery[slot] = Some(state.time);
-    state.low[slot] = state.time;
+    let node_discovery = state.time;
+    state.discovery[slot] = Some(node_discovery);
+    state.low[slot] = node_discovery;
     state.time += 1;
     let mut children = 0;
     let mut incident = graph.incident_edges(node).collect::<Vec<_>>();
@@ -95,7 +96,6 @@ where
         children += 1;
         visit(graph, neighbor, Some(edge), state);
         state.low[slot] = state.low[slot].min(state.low[neighbor_slot]);
-        let node_discovery = state.discovery[slot].expect("visited node has discovery time");
         if state.low[neighbor_slot] > node_discovery {
             state.bridges.push(edge);
         }

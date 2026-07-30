@@ -179,12 +179,16 @@ impl NeighborCsr {
                 let offset_low_bits = offsets.low_bits();
                 let global_bytes =
                     neighbors.len().div_ceil(64) * usize::from(bits) * size_of::<u64>();
-                let neighbor_storage =
-                    if AdaptivePackedU32::estimated_storage_bytes(&neighbors) < global_bytes {
-                        NeighborStorage::Adaptive(AdaptivePackedU32::from_values(&neighbors))
-                    } else {
-                        NeighborStorage::Packed(PackedU32::from_values(&neighbors, bits))
-                    };
+                let neighbor_storage = if AdaptivePackedU32::estimated_storage_bytes(&neighbors)
+                    < global_bytes
+                {
+                    match AdaptivePackedU32::try_from_values(&neighbors) {
+                        Some(values) => NeighborStorage::Adaptive(values),
+                        None => NeighborStorage::Packed(PackedU32::from_values(&neighbors, bits)),
+                    }
+                } else {
+                    NeighborStorage::Packed(PackedU32::from_values(&neighbors, bits))
+                };
                 (
                     Self {
                         offsets: OffsetStorage::EliasFano(offsets),

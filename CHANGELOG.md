@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.6.3 - 2026-07-30
+
+- Remove production `unwrap`, `expect`, and unreachable panic paths from graph
+  algorithms, compact topology construction, traversal caches, and stable
+  payload mutation.
+- Preserve existing public APIs and valid-input results while expressing
+  internal invariants through checked conversions, fallible propagation, and
+  total control flow.
+- Add a repository regression that rejects future panic shortcuts in
+  production Rust modules.
+- Keep the strict architecture release contract at 300 lines per file, 100
+  lines per function, zero runtime cycles, no dual module layouts, and no
+  exceptions or accepted baseline.
+
 ## 0.6.2 - 2026-07-30
 
 - Normalize every nested Rust module to one idiomatic `foo/mod.rs` source form

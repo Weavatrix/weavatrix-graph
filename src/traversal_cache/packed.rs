@@ -59,7 +59,7 @@ impl PackedU32 {
         if offset + bits > 64 {
             value |= self.words[word + 1] << (64 - offset);
         }
-        u32::try_from(value & mask(self.bits)).expect("packed value is at most 32 bits")
+        u32::try_from(value & mask(self.bits)).unwrap_or(u32::MAX)
     }
 
     pub(super) fn storage_bytes(&self) -> usize {
@@ -124,5 +124,5 @@ fn read(words: &[u64], bit: usize, bits: u8) -> u32 {
     if offset + width > 64 {
         value |= words[word + 1] << (64 - offset);
     }
-    u32::try_from(value & mask(bits)).expect("packed value is at most 32 bits")
+    u32::try_from(value & mask(bits)).unwrap_or(u32::MAX)
 }

@@ -194,7 +194,9 @@ where
                 continue;
             }
             let node = frame.node;
-            let neighbor = graph.opposite(edge, node).expect("incident edge has node");
+            let Some(neighbor) = graph.opposite(edge, node) else {
+                continue;
+            };
             if neighbor == node {
                 let edge_slot = G::edge_slot(edge);
                 if !self.seen_self_loop[edge_slot] {
@@ -237,7 +239,7 @@ where
         let mut chains = Vec::new();
         for ancestor in self.order {
             visited[G::node_slot(ancestor)] = true;
-            for back in &self.back_edges[G::node_slot(ancestor)] {
+            'back_edges: for back in &self.back_edges[G::node_slot(ancestor)] {
                 let mut chain = vec![ChainStep {
                     edge: back.edge,
                     source: ancestor,
@@ -247,9 +249,12 @@ where
                 while !visited[G::node_slot(cursor)] {
                     visited[G::node_slot(cursor)] = true;
                     let slot = G::node_slot(cursor);
-                    let parent = self.parent_node[slot].expect("unvisited descendant has parent");
+                    let Some((parent, edge)) = self.parent_node[slot].zip(self.parent_edge[slot])
+                    else {
+                        continue 'back_edges;
+                    };
                     chain.push(ChainStep {
-                        edge: self.parent_edge[slot].expect("non-root has parent edge"),
+                        edge,
                         source: cursor,
                         target: parent,
                     });
