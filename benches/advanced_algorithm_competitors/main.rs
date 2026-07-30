@@ -1,5 +1,5 @@
-#[path = "advanced_algorithm_competitors/dag_intelligence.rs"]
 mod dag_intelligence;
+#[path = "../support/mod.rs"]
 mod support;
 
 use petgraph::algo::{

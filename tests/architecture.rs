@@ -20,29 +20,35 @@ fn rust_sources_stay_small_and_focused() {
 }
 
 #[test]
-fn domain_modules_use_facades_with_focused_leaf_files() {
+fn foundation_modules_use_facades_with_focused_leaf_files() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     assert_leaf_modules(
         &root,
-        "src/model.rs",
+        "src/model/mod.rs",
         "src/model",
         &["element.rs", "id.rs", "provenance.rs", "span.rs"],
     );
     assert_leaf_modules(
         &root,
-        "src/kind.rs",
+        "src/kind/mod.rs",
         "src/kind",
         &["edge.rs", "evidence.rs", "node.rs", "string.rs"],
     );
     assert_leaf_modules(
         &root,
-        "src/topology.rs",
+        "src/topology/mod.rs",
         "src/topology",
-        &["core.rs", "csr.rs", "index.rs", "parallel.rs", "view.rs"],
+        &[
+            "core.rs",
+            "csr/mod.rs",
+            "index.rs",
+            "parallel.rs",
+            "view.rs",
+        ],
     );
     assert_leaf_modules(
         &root,
-        "src/traversal_cache.rs",
+        "src/traversal_cache/mod.rs",
         "src/traversal_cache",
         &[
             "adaptive.rs",
@@ -59,7 +65,7 @@ fn domain_modules_use_facades_with_focused_leaf_files() {
     );
     assert_leaf_modules(
         &root,
-        "src/graph.rs",
+        "src/graph/mod.rs",
         "src/graph",
         &[
             "builder.rs",
@@ -71,20 +77,25 @@ fn domain_modules_use_facades_with_focused_leaf_files() {
     );
     assert_leaf_modules(
         &root,
-        "src/working.rs",
+        "src/working/mod.rs",
         "src/working",
         &["core.rs", "freeze.rs", "key.rs", "mutate.rs", "view.rs"],
     );
+}
+
+#[test]
+fn behavior_modules_use_facades_with_focused_leaf_files() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     assert_leaf_modules(
         &root,
-        "src/algo.rs",
+        "src/algo/mod.rs",
         "src/algo",
         &[
             "astar.rs",
             "bellman.rs",
-            "components.rs",
+            "components/mod.rs",
             "dominators.rs",
-            "flow.rs",
+            "flow/mod.rs",
             "mst.rs",
             "rank.rs",
             "shortest.rs",
@@ -94,29 +105,48 @@ fn domain_modules_use_facades_with_focused_leaf_files() {
     );
     assert_leaf_modules(
         &root,
-        "src/algo/flow.rs",
+        "src/algo/flow/mod.rs",
         "src/algo/flow",
         &["core.rs", "cut.rs"],
     );
     assert_leaf_modules(
         &root,
-        "src/algo/components.rs",
+        "src/algo/components/mod.rs",
         "src/algo/components",
         &["condensation.rs", "dag.rs", "scc.rs", "weak.rs"],
     );
     assert_leaf_modules(
         &root,
-        "src/undirected.rs",
+        "src/undirected/mod.rs",
         "src/undirected",
         &["core.rs", "view.rs"],
     );
-    assert_leaf_modules(&root, "src/matrix.rs", "src/matrix", &["dense.rs"]);
+    assert_leaf_modules(&root, "src/matrix/mod.rs", "src/matrix", &["dense.rs"]);
     assert_leaf_modules(
         &root,
-        "src/generator.rs",
+        "src/generator/mod.rs",
         "src/generator",
         &["deterministic.rs", "random.rs"],
     );
+}
+
+#[test]
+fn module_layout_uses_one_source_form() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut sources = Vec::new();
+    collect_rust_sources(&root, &mut sources);
+
+    for path in sources {
+        if path.file_name().is_some_and(|name| name == "mod.rs") {
+            continue;
+        }
+        let sibling_module = path.with_extension("");
+        assert!(
+            !sibling_module.is_dir(),
+            "{} has both foo.rs and foo/ module forms",
+            path.strip_prefix(&root).unwrap().display()
+        );
+    }
 }
 
 #[test]

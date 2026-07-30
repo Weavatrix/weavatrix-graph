@@ -1,101 +1,87 @@
 {
   "architectureContractV": 1,
-  "name": "Weavatrix Graph modular Rust architecture",
-  "style": "facade-modules",
-  "enforcement": "ratchet",
+  "name": "Weavatrix Graph layered graph-core architecture",
+  "style": "layered-modules",
+  "enforcement": "strict",
   "components": [
     {
-      "id": "core-primitives",
-      "name": "Core primitives and crate facade",
+      "id": "model",
+      "name": "Evidence model and validation primitives",
       "paths": [
         "src/attribute.rs",
         "src/error.rs",
         "src/filter.rs",
-        "src/legacy.rs",
-        "src/lib.rs",
-        "src/model.rs",
+        "src/kind",
         "src/model"
       ]
     },
     {
-      "id": "kinds",
-      "name": "Extensible kind contracts",
+      "id": "views",
+      "name": "Topology, matrix, and graph-view contracts",
       "paths": [
-        "src/kind.rs",
-        "src/kind"
-      ]
-    },
-    {
-      "id": "topology",
-      "name": "Compact directed topology",
-      "paths": [
-        "src/topology.rs",
-        "src/topology"
-      ]
-    },
-    {
-      "id": "graph",
-      "name": "Canonical evidence graph",
-      "paths": [
-        "src/graph.rs",
-        "src/graph"
-      ]
-    },
-    {
-      "id": "working-graph",
-      "name": "Mutable working graph",
-      "paths": [
-        "src/working.rs",
-        "src/working"
+        "src/matrix",
+        "src/operator.rs",
+        "src/topology",
+        "src/undirected",
+        "src/view"
       ]
     },
     {
       "id": "algorithms",
-      "name": "Graph algorithms",
+      "name": "Generic graph algorithms",
+      "paths": ["src/algo"]
+    },
+    {
+      "id": "storage",
+      "name": "Canonical, mutable, payload, and traversal storage",
       "paths": [
-        "src/algo.rs",
-        "src/algo"
+        "src/graph",
+        "src/payload",
+        "src/traversal_cache",
+        "src/working"
       ]
     },
     {
-      "id": "undirected",
-      "name": "Undirected topology",
+      "id": "interchange",
+      "name": "Formats, generators, and legacy conversion",
       "paths": [
-        "src/undirected.rs",
-        "src/undirected"
+        "src/format",
+        "src/generator",
+        "src/legacy.rs"
       ]
     },
     {
-      "id": "matrix",
-      "name": "Dense adjacency matrix",
-      "paths": [
-        "src/matrix.rs",
-        "src/matrix"
-      ]
+      "id": "facade",
+      "name": "Public crate facade",
+      "paths": ["src/lib.rs"]
     },
     {
-      "id": "generators",
-      "name": "Deterministic graph generators",
+      "id": "verification",
+      "name": "Tests, benchmarks, examples, and fuzz targets",
       "paths": [
-        "src/generator.rs",
-        "src/generator"
-      ]
-    },
-    {
-      "id": "examples",
-      "name": "examples",
-      "paths": [
-        "examples"
+        "benches",
+        "examples",
+        "fuzz",
+        "tests"
       ]
     }
   ],
-  "dependencyRules": [],
+  "dependencyRules": [
+    {
+      "id": "runtime-does-not-depend-on-verification",
+      "action": "forbid",
+      "from": ["model", "views", "algorithms", "storage", "interchange", "facade"],
+      "to": ["verification"],
+      "kinds": ["imports", "re_exports", "depends_on"]
+    }
+  ],
   "budgets": {
     "runtimeCycles": 0,
-    "maxFileLoc": 300
+    "maxFileLoc": 300,
+    "maxFunctionLoc": 100
   },
   "technologies": {
-    "required": [],
+    "required": ["rust"],
     "forbidden": []
   },
   "exceptions": [],
@@ -104,6 +90,5 @@
       "fingerprints": [],
       "metrics": {}
     }
-  },
-  "contractHash": "35809bac565b1b3c18e3331781bffe9731552c4fd3e4522bf9d359589e1b96a8"
+  }
 }

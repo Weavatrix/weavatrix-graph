@@ -1,5 +1,5 @@
-#[path = "scale_graph_competitors/helpers.rs"]
 mod helpers;
+#[path = "../support/mod.rs"]
 mod support;
 
 use graaf::{Bfs as GraafBfs, Size};

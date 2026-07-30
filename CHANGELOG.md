@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## 0.6.2 - 2026-07-30
+
+- Normalize every nested Rust module to one idiomatic `foo/mod.rs` source form
+  without changing public paths, algorithms, serialization, or graph
+  semantics.
+- Replace the architecture ratchet with a strict layered graph-core contract:
+  300 lines per file, 100 lines per function, zero runtime cycles, no
+  exceptions, and no accepted baseline.
+- Add a regression that rejects future `foo.rs` plus `foo/` module collisions,
+  and document the evidence-model, view, algorithm, storage, interchange, and
+  public-facade boundaries.
+- Keep the MIT license and the same default one-dependency runtime surface.
+
+## 0.6.1 - 2026-07-28
+
+- Canonicalize rich edges by sorting index permutations, moving every wide edge
+  only once and avoiding per-source bucket allocations while preserving exact
+  canonical order, deduplication, and validation errors.
+- Reserve topology construction from iterator size hints and pin the optimized
+  path against the independent already-sorted build path.
+
 ## 0.6.0 - 2026-07-27
 
 - Add safe and opt-in `unsafe-fast` parallel dual-CSR builders with stable and

@@ -6,10 +6,12 @@
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/sergii-ziborov/weavatrix-graph/blob/main/LICENSE)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://github.com/sergii-ziborov/weavatrix-graph/blob/main/Cargo.toml)
 
-`weavatrix-graph` is a small Rust library for deterministic, typed,
-evidence-carrying graphs. It is the graph foundation of Weavatrix, but it is
-usable by repository analyzers, architecture tools, dependency explorers, and
-other applications without depending on Weavatrix itself.
+**The deterministic graph core behind Weavatrix repository intelligence.**
+
+`weavatrix-graph` is the protocol-independent Rust library that gives
+Weavatrix its typed, evidence-carrying repository graph. It is also usable by
+repository analyzers, architecture tools, dependency explorers, and other
+applications without depending on the Weavatrix engine or MCP product.
 
 The crate owns graph integrity and serialization. It does **not** walk files,
 parse programming languages, execute commands, access the network, or provide
@@ -85,6 +87,32 @@ an MCP/CLI transport.
   primitives;
 - the default build has one runtime dependency, `serde`, while the optional
   `rayon` feature is isolated from the core.
+
+## Architecture
+
+The crate is a layered graph core, not a monolithic graph type. Dependencies
+flow from stable contracts toward specialized behavior:
+
+| Layer | Modules | Responsibility |
+| --- | --- | --- |
+| Evidence model | `attribute`, `error`, `filter`, `kind`, `model` | Typed identities, kinds, provenance, confidence, spans, attributes, and validation errors |
+| Graph views | `topology`, `undirected`, `matrix`, `view`, `operator` | Compact endpoints and the generic directed/undirected view contracts algorithms consume |
+| Algorithms | `algo` | Traversal, paths, components, cuts, flow, ranking, matching, and structural analysis over views |
+| Storage | `graph`, `working`, `payload`, `traversal_cache` | Canonical evidence snapshots, mutable builders, stable payload graphs, and derived traversal indexes |
+| Interchange | `format`, `generator`, `legacy` | Deterministic wire formats, seeded graph construction, and compatibility conversion |
+| Public facade | `lib.rs` | Stable crate-root re-exports without owning domain logic |
+
+Module trees use one idiomatic source form: nested modules live under
+`foo/mod.rs`, never beside a competing `foo.rs`. The strict
+`.weavatrix/architecture.json` contract enforces a 300-line file budget,
+100-line function budget, zero runtime dependency cycles, and no exception or
+ratchet baseline. `tests/architecture.rs` independently guards file size,
+single-form module layout, focused facades, dependency uniqueness, and wire-kind
+uniqueness.
+
+The default and `no_std` paths forbid unsafe code. The explicitly enabled
+`unsafe-fast` feature remains isolated to audited matrix and CSR primitives;
+it does not change the public layering or graph invariants.
 
 ## Layered graph contracts
 
@@ -931,16 +959,18 @@ cargo llvm-cov --workspace --all-features --fail-under-lines 85
 cargo bench --all-features --locked
 ```
 
-The test suite includes architecture and duplicate-contract ratchets: every Rust
-source stays at or below 300 lines, domain facades remain small, runtime
-dependencies remain limited, and canonical kind strings cannot collide.
+The release gates combine the test suite with strict architecture verification:
+every Rust source stays at or below 300 lines, every function stays at or below
+100 lines, module source forms cannot collide, domain facades remain focused,
+runtime dependencies remain limited, and canonical kind strings cannot
+collide.
 
 CI also runs measured Rust coverage with `cargo-llvm-cov`, emits `lcov.info`
 for analyzer import, and fails below 85% line coverage. It additionally runs
 Linux `proptest` contracts, Miri over traversal/view/analytics/mutable storage,
 and bounded libFuzzer smoke targets for topology, matrices, mutation, and
-interchange formats. Weavatrix architecture
-verification is backed by `.weavatrix/architecture.json`. The current local
+interchange formats. Weavatrix architecture verification is backed by the
+strict `.weavatrix/architecture.json` contract. The current local
 MSVC LLVM report measures 92.28% of lines and 88.81% of functions.
 
 ## License

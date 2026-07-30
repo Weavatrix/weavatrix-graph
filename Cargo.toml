@@ -1,9 +1,9 @@
 ﻿[package]
 name = "weavatrix-graph"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2024"
 rust-version = "1.88"
-description = "Deterministic, evidence-carrying graph primitives for repository intelligence"
+description = "Deterministic, evidence-carrying graph core for Weavatrix repository intelligence"
 license = "MIT"
 authors = ["Sergii Ziborov <sergii.ziborov@gmail.com>"]
 homepage = "https://weavatrix.com"
@@ -61,6 +61,7 @@ harness = false
 
 [[bench]]
 name = "advanced_algorithm_competitors"
+path = "benches/advanced_algorithm_competitors/main.rs"
 harness = false
 
 [[bench]]
@@ -82,6 +83,7 @@ harness = false
 
 [[bench]]
 name = "scale_graph_competitors"
+path = "benches/scale_graph_competitors/main.rs"
 harness = false
 
 [[bench]]
