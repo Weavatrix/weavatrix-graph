@@ -9,13 +9,28 @@
 **The deterministic graph core behind Weavatrix repository intelligence.**
 
 `weavatrix-graph` is the protocol-independent Rust library that gives
-Weavatrix its typed, evidence-carrying repository graph. It is also usable by
-repository analyzers, architecture tools, dependency explorers, and other
-applications without depending on the Weavatrix engine or MCP product.
+Weavatrix its typed, evidence-carrying **code / repository graph**. It is also
+usable by repository analyzers, architecture tools, dependency explorers, and
+other applications without depending on the Weavatrix engine or MCP product.
 
 The crate owns graph integrity and serialization. It does **not** walk files,
 parse programming languages, execute commands, access the network, or provide
 an MCP/CLI transport.
+
+### Not Weavatrix Loom’s semantic graph
+
+This is the **code graph** (files, symbols, calls, imports, evidence spans).
+It is **not** the WVX **capability graph** (Capability, Instance, Binding,
+Implementation, Registry).
+
+| Graph | Owner |
+| --- | --- |
+| Code / repository graph | **Weavatrix** (+ this crate) |
+| Semantic composition graph (WVX) | **[Weavatrix Loom](https://github.com/sergii-ziborov/weavatrix-loom)** |
+
+Do not merge node kinds. Loom may **reference** entities (provenance) but must
+not embed or fork this graph as its project IR. See Loom
+[ADR-0012](https://github.com/sergii-ziborov/weavatrix-loom/blob/main/docs/adr/0012-ecosystem-boundaries.md).
 
 ## Properties
 
