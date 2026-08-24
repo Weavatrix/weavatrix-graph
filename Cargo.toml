@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "weavatrix-graph"
 version = "0.6.3"
 edition = "2024"
@@ -7,7 +7,7 @@ description = "Deterministic, evidence-carrying graph core for Weavatrix reposit
 license = "MIT"
 authors = ["Sergii Ziborov <sergii.ziborov@gmail.com>"]
 homepage = "https://weavatrix.com"
-repository = "https://github.com/sergii-ziborov/weavatrix-graph"
+repository = "https://github.com/Weavatrix/weavatrix-graph"
 documentation = "https://docs.rs/weavatrix-graph"
 readme = "README.md"
 keywords = ["graph", "code-graph", "static-analysis", "provenance", "architecture"]

@@ -1,10 +1,12 @@
 # Weavatrix Graph
 
-[![CI](https://github.com/sergii-ziborov/weavatrix-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/sergii-ziborov/weavatrix-graph/actions/workflows/ci.yml)
+[![CI](https://github.com/Weavatrix/weavatrix-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/Weavatrix/weavatrix-graph/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/weavatrix-graph.svg)](https://crates.io/crates/weavatrix-graph)
 [![docs.rs](https://docs.rs/weavatrix-graph/badge.svg)](https://docs.rs/weavatrix-graph)
-[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/sergii-ziborov/weavatrix-graph/blob/main/LICENSE)
-[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://github.com/sergii-ziborov/weavatrix-graph/blob/main/Cargo.toml)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Weavatrix/weavatrix-graph/blob/main/LICENSE)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://github.com/Weavatrix/weavatrix-graph/blob/main/Cargo.toml)
+
+Part of the [Weavatrix ecosystem](https://weavatrix.com/ecosystem): the evidence graph shared by repository-intelligence engines.
 
 **The deterministic graph core behind Weavatrix repository intelligence.**
 
@@ -26,11 +28,11 @@ Implementation, Registry).
 | Graph | Owner |
 | --- | --- |
 | Code / repository graph | **Weavatrix** (+ this crate) |
-| Semantic composition graph (WVX) | **[Weavatrix Loom](https://github.com/sergii-ziborov/weavatrix-loom)** |
+| Semantic composition graph (WVX) | **[Weavatrix Loom](https://github.com/Weavatrix/weavatrix-loom)** |
 
 Do not merge node kinds. Loom may **reference** entities (provenance) but must
 not embed or fork this graph as its project IR. See Loom
-[ADR-0012](https://github.com/sergii-ziborov/weavatrix-loom/blob/main/docs/adr/0012-ecosystem-boundaries.md).
+[ADR-0012](https://github.com/Weavatrix/weavatrix-loom/blob/main/docs/adr/0012-ecosystem-boundaries.md).
 
 ## Properties
 
