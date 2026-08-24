@@ -1,6 +1,6 @@
 {
   "name": "weavatrix-graph",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Deterministic, evidence-carrying Rust graph core for Node.js and Bun",
   "license": "MIT",
   "author": "Sergii Ziborov <sergii.ziborov@gmail.com>",
@@ -16,6 +16,7 @@
     "lib/",
     "index.js",
     "index.d.ts",
+    "*.node",
     "README.md"
   ],
   "engines": {
@@ -51,9 +52,7 @@
     "build:windows:debug": "napi build --platform --target x86_64-pc-windows-msvc",
     "test": "node --test test/graph.test.js",
     "test:bun": "bun test ./test",
-    "bench": "node benchmark/graphology.mjs",
-    "artifacts": "napi artifacts",
-    "prepublishOnly": "napi pre-publish -t npm"
+    "bench": "node benchmark/graphology.mjs"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.8.6",

@@ -202,8 +202,9 @@ const graph = new Graph({
 console.log(graph.shortestPath('api', 'db'))
 ```
 
-Published native targets cover Windows, macOS, and glibc Linux on x64 and
-arm64. The [Node/Bun benchmark report](node/benchmark/RESULTS.md) states the
+The single self-contained package carries native binaries for Windows, macOS,
+and glibc Linux on x64 and arm64; it creates no public platform-package names.
+The [Node/Bun benchmark report](node/benchmark/RESULTS.md) states the
 output-parity contract, runtime versions, medians, and timer-noise boundary.
 On its disclosed 50k-node / 149,991-edge BFS fixture, the binding measured
 2.91x faster than Graphology on Node 24 and 2.64x on Bun 1.4. The npm library

@@ -52,7 +52,7 @@ At ten nodes both sides fall into roughly 0.004-0.006 ms timer noise, so the pro
 
 ## Runtime and ownership boundary
 
-One npm package supports Node.js 18+ and Bun 1.4+. Optional native packages cover Windows, macOS, and glibc Linux on x64 and arm64. The Node-API 8 ABI keeps the addon independent of a single Node major version.
+One self-contained npm package supports Node.js 18+ and Bun 1.4+ and includes the Windows, macOS, and glibc Linux binaries for x64 and arm64. No public platform-package names are created. The Node-API 8 ABI keeps the addon independent of a single Node major version.
 
 Graph owns its repository, package, release evidence, and MIT license. It can be used independently of every other Weavatrix product.
 
