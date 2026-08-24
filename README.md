@@ -3,6 +3,7 @@
 [![CI](https://github.com/Weavatrix/weavatrix-graph/actions/workflows/ci.yml/badge.svg)](https://github.com/Weavatrix/weavatrix-graph/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/weavatrix-graph.svg)](https://crates.io/crates/weavatrix-graph)
 [![docs.rs](https://docs.rs/weavatrix-graph/badge.svg)](https://docs.rs/weavatrix-graph)
+[![npm](https://img.shields.io/npm/v/weavatrix-graph.svg)](https://www.npmjs.com/package/weavatrix-graph)
 [![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Weavatrix/weavatrix-graph/blob/main/LICENSE)
 [![MSRV](https://img.shields.io/badge/MSRV-1.88-blue.svg)](https://github.com/Weavatrix/weavatrix-graph/blob/main/Cargo.toml)
 
@@ -19,42 +20,30 @@ The crate owns graph integrity and serialization. It does **not** walk files,
 parse programming languages, execute commands, access the network, or provide
 an MCP/CLI transport.
 
-### Complementary to Weavatrix Loom
+### Why this graph core
 
-`weavatrix-graph` and
-**[Weavatrix Loom](https://github.com/Weavatrix/weavatrix-loom)** are
-complementary layers of the same ecosystem, not competing graph products.
+Most graph libraries stop at topology. `weavatrix-graph` keeps topology,
+domain payloads, stable identities, typed relations, confidence, source spans,
+and provenance under one deterministic contract. Its algorithms work over
+compact graph views, so repository-intelligence engines can retain evidence
+without giving up a purpose-built algorithm layer.
 
-**Weavatrix Loom is a visual programming environment and compiler that turns
-real code into reusable typed blocks, lets humans and AI compose programs from
-those blocks, runs and debugs the graph, and compiles the result into ordinary
-standalone software.**
+The repository tests equal-output contracts against established graph crates
+and publishes the rows where a narrower competitor wins as well as the rows
+where Weavatrix leads. Selected release-build measurements include:
 
-Weavatrix supplies the grounded view of that real code: files, symbols, calls,
-imports, source spans, revisions, and provenance. The integration contract is
-for Loom to reference those facts when it identifies and traces
-implementations, while its WVX model owns the typed capabilities, instances,
-bindings, composition, execution, debugging, and compilation workflow.
+| Equal-output workload | Measured result |
+| --- | ---: |
+| 200k nodes / 1M edges, materialized BFS | 3.81x faster than petgraph; 2.68x faster than graaf |
+| 200k nodes / 1M edges, strongly connected components | 3.43x faster than petgraph |
+| PageRank, 20 iterations | 181.58x faster than petgraph |
+| Edge betweenness, Rayon | 19.64x faster than the equal-equation petgraph adapter |
+| Multi-start metric-closure Steiner tree | 172.45x faster, with lower measured cost |
+| Million-file graph workload, rich evidence snapshot | 3.4% faster than the petgraph adapter |
 
-```text
-real code
-   → Weavatrix code facts and provenance
-   → Loom reusable typed blocks
-   → human + AI visual composition
-   → run and debug the graph
-   → compile to ordinary standalone software
-```
-
-The two graph models remain distinct so evidence about existing code is not
-confused with the program being composed. Loom references Weavatrix entities
-through provenance rather than copying the repository graph into its project
-IR. That separation is an integration contract, not a product rivalry. See
-Loom [ADR-0012](https://github.com/Weavatrix/weavatrix-loom/blob/main/docs/adr/0012-ecosystem-boundaries.md).
-
-The boundary is defined today; the direct Weavatrix-facts feed is still an
-integration target, and Loom Forge currently retains a clearly marked bootstrap
-inventory. `weavatrix-graph` therefore does not pretend to be an already-wired
-Loom runtime dependency.
+These are scoped workload results, not a universal speed claim. Full inputs,
+output-parity rules, slower rows, medians, caveats, and reproduction commands
+are kept in [Benchmarks](#benchmarks).
 
 ## Properties
 
@@ -185,7 +174,39 @@ shared graph views. `StableUndirectedPayloadGraph` implements
 `IndexUndirectedGraphView` directly, so BCC, MST, matching, coloring, and other
 undirected algorithms run before or after mutation without an adapter.
 
-## Example
+## Node.js and Bun
+
+The `weavatrix-graph` npm package is the same Rust graph core behind a stable
+Node-API boundary, not a JavaScript rewrite and not an MCP server. One package
+supports Node.js 18+ and Bun 1.4+:
+
+```console
+npm install weavatrix-graph
+# or: bun add weavatrix-graph
+```
+
+```js
+const { Graph } = require('weavatrix-graph')
+
+const graph = new Graph({
+  nodes: [
+    { id: 'api', label: 'API', kind: 'service' },
+    { id: 'db', label: 'Database', kind: 'table' },
+  ],
+  edges: [{
+    source: 'api', target: 'db', kind: 'reads',
+    provenance: { extractor: 'architecture', evidence: 'parsed', confidence: 'exact' },
+  }],
+})
+
+console.log(graph.shortestPath('api', 'db'))
+```
+
+Published native targets cover Windows, macOS, and glibc Linux on x64 and
+arm64. The [Node/Bun benchmark report](node/benchmark/RESULTS.md) states the
+output-parity contract, runtime versions, medians, and timer-noise boundary.
+
+## Rust example
 
 ```rust
 use weavatrix_graph::{
@@ -1021,6 +1042,15 @@ and bounded libFuzzer smoke targets for topology, matrices, mutation, and
 interchange formats. Weavatrix architecture verification is backed by the
 strict `.weavatrix/architecture.json` contract. The current local
 MSVC LLVM report measures 92.28% of lines and 88.81% of functions.
+
+## Ecosystem relation
+
+`weavatrix-graph` grounds what already exists in source: files, symbols, calls,
+imports, spans, revisions, and provenance. Downstream products can reference
+those facts without weakening or copying the evidence graph. For example,
+[Weavatrix Loom](https://github.com/Weavatrix/weavatrix-loom) is a complementary
+visual programming and compilation layer over real code; it is not a competing
+replacement for this graph core.
 
 ## License
 

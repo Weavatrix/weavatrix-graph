@@ -1,0 +1,62 @@
+{
+  "name": "weavatrix-graph",
+  "version": "0.6.3",
+  "description": "Deterministic, evidence-carrying Rust graph core for Node.js and Bun",
+  "license": "MIT",
+  "author": "Sergii Ziborov <sergii.ziborov@gmail.com>",
+  "homepage": "https://weavatrix.com/ecosystem",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Weavatrix/weavatrix-graph.git",
+    "directory": "node"
+  },
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib/",
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "keywords": [
+    "graph",
+    "rust",
+    "node-api",
+    "bun",
+    "provenance",
+    "static-analysis"
+  ],
+  "napi": {
+    "binaryName": "weavatrix-graph",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ]
+  },
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "build:windows": "napi build --platform --release --target x86_64-pc-windows-msvc",
+    "build:windows:debug": "napi build --platform --target x86_64-pc-windows-msvc",
+    "test": "node --test test/*.test.js",
+    "test:bun": "bun test test/*.test.js",
+    "bench": "node benchmark/graphology.mjs",
+    "artifacts": "napi artifacts",
+    "prepublishOnly": "napi pre-publish -t npm"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.8.6",
+    "graphology": "^0.26.0"
+  }
+}

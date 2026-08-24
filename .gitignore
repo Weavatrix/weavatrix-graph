@@ -1,4 +1,7 @@
 /target/
+/node/target/
+/node/node_modules/
+/node/*.node
 /fuzz/target/
 /coverage/
 /lcov.info
