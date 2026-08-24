@@ -36,7 +36,7 @@ where Weavatrix leads. Selected release-build measurements include:
 | --- | ---: |
 | 200k nodes / 1M edges, materialized BFS | 3.81x faster than petgraph; 2.68x faster than graaf |
 | 200k nodes / 1M edges, strongly connected components | 3.43x faster than petgraph |
-| PageRank, 20 iterations | 181.58x faster than petgraph |
+| `PageRank`, 20 iterations | 181.58x faster than petgraph |
 | Edge betweenness, Rayon | 19.64x faster than the equal-equation petgraph adapter |
 | Multi-start metric-closure Steiner tree | 172.45x faster, with lower measured cost |
 | Million-file graph workload, rich evidence snapshot | 3.4% faster than the petgraph adapter |
