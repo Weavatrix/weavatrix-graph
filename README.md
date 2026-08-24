@@ -19,20 +19,42 @@ The crate owns graph integrity and serialization. It does **not** walk files,
 parse programming languages, execute commands, access the network, or provide
 an MCP/CLI transport.
 
-### Not Weavatrix Loom’s semantic graph
+### Complementary to Weavatrix Loom
 
-This is the **code graph** (files, symbols, calls, imports, evidence spans).
-It is **not** the WVX **capability graph** (Capability, Instance, Binding,
-Implementation, Registry).
+`weavatrix-graph` and
+**[Weavatrix Loom](https://github.com/Weavatrix/weavatrix-loom)** are
+complementary layers of the same ecosystem, not competing graph products.
 
-| Graph | Owner |
-| --- | --- |
-| Code / repository graph | **Weavatrix** (+ this crate) |
-| Semantic composition graph (WVX) | **[Weavatrix Loom](https://github.com/Weavatrix/weavatrix-loom)** |
+**Weavatrix Loom is a visual programming environment and compiler that turns
+real code into reusable typed blocks, lets humans and AI compose programs from
+those blocks, runs and debugs the graph, and compiles the result into ordinary
+standalone software.**
 
-Do not merge node kinds. Loom may **reference** entities (provenance) but must
-not embed or fork this graph as its project IR. See Loom
-[ADR-0012](https://github.com/Weavatrix/weavatrix-loom/blob/main/docs/adr/0012-ecosystem-boundaries.md).
+Weavatrix supplies the grounded view of that real code: files, symbols, calls,
+imports, source spans, revisions, and provenance. The integration contract is
+for Loom to reference those facts when it identifies and traces
+implementations, while its WVX model owns the typed capabilities, instances,
+bindings, composition, execution, debugging, and compilation workflow.
+
+```text
+real code
+   → Weavatrix code facts and provenance
+   → Loom reusable typed blocks
+   → human + AI visual composition
+   → run and debug the graph
+   → compile to ordinary standalone software
+```
+
+The two graph models remain distinct so evidence about existing code is not
+confused with the program being composed. Loom references Weavatrix entities
+through provenance rather than copying the repository graph into its project
+IR. That separation is an integration contract, not a product rivalry. See
+Loom [ADR-0012](https://github.com/Weavatrix/weavatrix-loom/blob/main/docs/adr/0012-ecosystem-boundaries.md).
+
+The boundary is defined today; the direct Weavatrix-facts feed is still an
+integration target, and Loom Forge currently retains a clearly marked bootstrap
+inventory. `weavatrix-graph` therefore does not pretend to be an already-wired
+Loom runtime dependency.
 
 ## Properties
 
