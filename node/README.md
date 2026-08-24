@@ -1,10 +1,12 @@
 # weavatrix-graph
 
-The evidence graph behind Weavatrix, available as an independent native product for Node.js and Bun.
+A deterministic, evidence-carrying directed graph with production algorithms —
+written in Rust, exposed to Node.js and Bun through Node-API.
 
-It combines deterministic topology with stable identities, typed relations, provenance, confidence, source spans, canonical serialization, and production graph algorithms. This is the Rust `weavatrix-graph` core through Node-API—not a JavaScript rewrite and not an MCP server.
-
-## Install
+Every edge carries **provenance**: which extractor produced it, what evidence
+backs it, how confident that evidence is, and optionally where in the source it
+came from. That is the difference between a graph you can query and a graph you
+can defend.
 
 ```console
 npm install weavatrix-graph
@@ -24,36 +26,129 @@ const graph = new Graph({
     source: 'api',
     target: 'db',
     kind: 'reads',
-    provenance: {
-      extractor: 'architecture',
-      evidence: 'parsed',
-      confidence: 'exact',
-    },
+    provenance: { extractor: 'architecture', evidence: 'parsed', confidence: 'exact' },
   }],
 })
 
-console.log(graph.shortestPath('api', 'db'))
-console.log(graph.stronglyConnectedComponents())
-console.log(graph.pageRank())
+graph.shortestPath('api', 'db')          // ['api', 'db']
+graph.hasCycle()                          // false
+graph.pageRank({ damping: 0.85 })         // [{ id, score }, …]
+graph.outgoing('api')[0].provenance        // why that edge exists
 ```
 
-The first native surface includes validated canonical graphs, incoming and outgoing evidence, BFS, shortest paths, strongly connected components, cycle detection, topological sort, PageRank, and deterministic DOT. The Rust product also owns the broader algorithm suite used by repository intelligence and architecture tooling.
+---
 
-## Measured Node and Bun performance
+## Input
 
-Equal-output contract: materialize the same directed-BFS node IDs on 50,000 nodes and 149,991 edges. Windows x64 medians after two warmups, with execution order alternated per round:
+### `GraphNode`
 
-| Runtime | Weavatrix | Graphology 0.26.0 | Result |
-| --- | ---: | ---: | ---: |
-| Node 24.15.0 | 12.813 ms | 37.267 ms | 2.91x faster |
-| Bun 1.4.0 | 9.105 ms | 24.001 ms | 2.64x faster |
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | `string` | Stable identity. Must be unique. |
+| `label` | `string` | Human-readable name. |
+| `kind` | `string` | Free-form node category. |
+| `language` | `string?` | |
+| `span` | `SourceSpan?` | `{ file, start: { line, column }, end: { line, column } }` |
+| `attributes` | `Record<string, AttributeValue>?` | Nested JSON values are allowed. |
 
-At ten nodes both sides fall into roughly 0.004-0.006 ms timer noise, so the project does not claim a small-graph winner. See the [full report, parity rule, caveats, and reproduction commands](https://github.com/Weavatrix/weavatrix-graph/blob/main/node/benchmark/RESULTS.md).
+### `GraphEdge`
 
-## Runtime and ownership boundary
+| Field | Type | Notes |
+| --- | --- | --- |
+| `source`, `target` | `string` | Must reference declared node ids. |
+| `kind` | `string` | Relation type, such as `calls`, `reads`, `implements`. |
+| `provenance` | `Provenance` | **Required.** `{ extractor, evidence, confidence, span?, detail? }` where `confidence` is `'exact' \| 'high' \| 'medium' \| 'low'`. |
+| `attributes` | `Record<string, AttributeValue>?` | |
 
-One self-contained npm package supports Node.js 18+ and Bun 1.4+ and includes the Windows, macOS, and glibc Linux binaries for x64 and arm64. No public platform-package names are created. The Node-API 8 ABI keeps the addon independent of a single Node major version.
+Requiring provenance on construction is deliberate: an edge nobody can justify
+never enters the graph.
 
-Graph owns its repository, package, release evidence, and MIT license. It can be used independently of every other Weavatrix product.
+---
 
-Repository: [Weavatrix/weavatrix-graph](https://github.com/Weavatrix/weavatrix-graph) · Rust crate: [crates.io/crates/weavatrix-graph](https://crates.io/crates/weavatrix-graph) · License: [MIT](https://github.com/Weavatrix/weavatrix-graph/blob/main/LICENSE)
+## API
+
+### `new Graph(input)`
+
+Validates the whole input and throws on a duplicate node id, a dangling edge
+endpoint, or a malformed provenance record.
+
+| Member | Returns | Notes |
+| --- | --- | --- |
+| `nodeCount` | `number` | |
+| `edgeCount` | `number` | |
+| `canonical()` | `GraphInput` | Deterministic serialization. Two graphs with equal content produce byte-identical output, which is what makes a graph diffable and cacheable. |
+| `node(id)` | `GraphNode \| undefined` | |
+| `outgoing(id)` | `GraphEdge[]` | Edges leaving `id`, with provenance intact. |
+| `incoming(id)` | `GraphEdge[]` | Edges arriving at `id`. |
+| `bfs(start)` | `string[]` | Materialized breadth-first visit order. |
+| `shortestPath(source, target)` | `string[] \| undefined` | Node ids inclusive of both ends; `undefined` when unreachable. |
+| `stronglyConnectedComponents()` | `string[][]` | Each component in deterministic order. |
+| `topologicalSort()` | `string[] \| undefined` | `undefined` when the graph has a cycle. |
+| `hasCycle()` | `boolean` | |
+| `pageRank(options?)` | `{ id, score }[]` | `{ damping = 0.85, iterations = 20 }`. Deterministic for a given graph and settings. |
+| `toDot()` | `string` | Deterministic Graphviz DOT. |
+
+Traversal methods throw `InvalidArg` for an unknown node id, rather than
+silently returning nothing.
+
+---
+
+## Determinism
+
+Component order, visit order, DOT output, and canonical serialization are all
+derived from content, never from insertion order or thread scheduling. The same
+input produces the same bytes on every platform and every run.
+
+---
+
+## Errors
+
+| `code` | Cause |
+| --- | --- |
+| `InvalidArg` | Malformed input JSON, duplicate node id, edge endpoint that references no node, unknown node id passed to a traversal, invalid PageRank settings. |
+
+---
+
+## What ships
+
+| | |
+| --- | --- |
+| Runtimes | Node.js 18+ (Node-API 8), Bun 1.4+ |
+| Platforms | Windows x64/arm64, macOS x64/arm64, glibc Linux x64/arm64 |
+| Install script | none |
+| Network at install | none |
+| Runtime dependencies | none |
+| Platform packages | none — all six bindings are in this one tarball |
+
+The Node-API 8 ABI keeps the addon independent of any single Node major
+version.
+
+---
+
+## Measured
+
+[`benchmark/RESULTS.md`](benchmark/RESULTS.md) is generated from the
+[weavatrix-benchmarks](https://github.com/Weavatrix/weavatrix-benchmarks)
+harness, which forces both sides to materialize the identical BFS visit order
+before either is timed. The competitor is `graphology`, the standard JavaScript
+graph library.
+
+Medians of three independent runs over 50,000 nodes and 149,991 edges:
+
+| Contract | Node 24 | Bun 1.3 |
+| --- | ---: | ---: |
+| Materialized directed BFS node ids | **2.98x** (2.91–3.14) | **2.98x** (2.82–3.20) |
+
+`graphology` stores a plain topology; the Weavatrix graph also retains typed
+provenance on every edge, so it is carrying more and still traversing faster.
+On a ten-node graph both sides sit in timer noise, and this project makes no
+small-graph claim.
+
+---
+
+Graph owns its repository, package, release evidence, and MIT license, and can
+be used entirely on its own.
+
+Repository: [Weavatrix/weavatrix-graph](https://github.com/Weavatrix/weavatrix-graph) ·
+Rust crate: [crates.io/crates/weavatrix-graph](https://crates.io/crates/weavatrix-graph) ·
+License: [MIT](https://github.com/Weavatrix/weavatrix-graph/blob/main/LICENSE)

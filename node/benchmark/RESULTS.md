@@ -1,21 +1,55 @@
 # Node.js and Bun benchmark snapshot
 
-Measured on 2026-08-24 on Windows x64. Values are medians after two warm-up rounds; execution order alternates per round. The benchmark asserts equal materialized directed-BFS node IDs before reporting timings.
+This file is generated. Every number below was produced by the
+[weavatrix-benchmarks](https://github.com/Weavatrix/weavatrix-benchmarks)
+harness and copied out of its recorded run; none of it is typed by hand.
+That repository states the rules every suite obeys, including what each
+row had to prove equal before it was allowed to be timed.
 
-| Runtime | Nodes / edges | Weavatrix | Graphology 0.26.0 | Result |
-| --- | ---: | ---: | ---: | ---: |
-| Node 24.15.0 | 50,000 / 149,991 | 12.813 ms | 37.267 ms | Weavatrix 2.91x faster |
-| Bun 1.4.0 | 50,000 / 149,991 | 9.105 ms | 24.001 ms | Weavatrix 2.64x faster |
+**Question.** How fast is a directed traversal over a code graph that carries provenance on every edge?
 
-A 10-node / 21-edge run completed in roughly 0.004-0.006 ms per side on Node, below a useful timer-noise boundary. Do not use that row to claim a small-graph winner: native-call overhead and timer resolution dominate it.
+**Competitor.** `graphology`
 
-Reproduce from `node/`:
+| Property | Value |
+| --- | --- |
+| Measured | 2026-08-24 |
+| Platform | win32 x64, 10.0.26200 |
+| CPU | Intel(R) Core(TM) Ultra 7 255U (14 logical cores) |
+| Memory | 47.5 GiB |
+| Rounds | 7 measured, after 2 warm-ups, alternating order, median reported |
+| Independent runs | 3 per suite, each in a fresh process; the table shows the median and the spread |
+| Package | weavatrix-graph 0.6.4 |
+
+## node 24.15.0
+
+Corpus: `[{"nodes":50000,"edges":149991}]`
+
+| Contract | Parity | Weavatrix | Competitor | Result |
+| --- | --- | ---: | ---: | ---: |
+| materialized directed BFS node ids | identical visit order | 7.464 ms | 22.072 ms | Weavatrix 2.98x faster (2.91x–3.14x) |
+
+## bun 1.3.14
+
+Corpus: `[{"nodes":50000,"edges":149991}]`
+
+| Contract | Parity | Weavatrix | Competitor | Result |
+| --- | --- | ---: | ---: | ---: |
+| materialized directed BFS node ids | identical visit order | 4.907 ms | 14.602 ms | Weavatrix 2.98x faster (2.82x–3.20x) |
+
+## Reading these rows
+
+- **materialized directed BFS node ids** — graphology stores a plain topology; the Weavatrix graph also retains typed provenance per edge
+
+## Reproduce
 
 ```console
-npm ci
-npm run build
-npm run bench
-bun run benchmark/graphology.mjs
+git clone https://github.com/Weavatrix/weavatrix-benchmarks
+cd weavatrix-benchmarks && npm ci
+node run.mjs --suite=graph
+bun run.mjs --suite=graph
+node export.mjs
 ```
 
-These are scoped measurements of one equal-output traversal contract, not a universal claim about all graph workloads. Rust-crate algorithm, memory, and losing-row benchmarks remain in the repository's main benchmark section.
+CPU, memory bandwidth, filesystem, antivirus, and JavaScript engine
+version all move these timings. Treat them as a reproducible snapshot of
+the environment above, not as a universal result.
