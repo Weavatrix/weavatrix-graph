@@ -1,6 +1,6 @@
 {
   "name": "weavatrix-graph",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Deterministic, evidence-carrying Rust graph core for Node.js and Bun",
   "license": "MIT",
   "author": "Sergii Ziborov <sergii.ziborov@gmail.com>",
