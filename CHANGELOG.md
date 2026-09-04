@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Raise the `weavatrix-scan` dev-dependency floor from 0.3.0 to 0.4.6, so the
+  filesystem-graph benchmark measures against the published scanner rather
+  than one pinned two minors back. This is a development dependency: no
+  consumer of this crate resolves it, and the published API is unchanged.
+
 ## 0.6.3 - 2026-07-30
 
 - Remove production `unwrap`, `expect`, and unreachable panic paths from graph

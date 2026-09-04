@@ -993,9 +993,9 @@ dependencies = [
 
 [[package]]
 name = "weavatrix-scan"
-version = "0.3.0"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65f936cd20f806f8bf97536cac61d0a32a2880cafa21ff43b5834eb44f3b89d4"
+checksum = "f411362c24f268e733b5820a6c118961a9954c9d9d8e3f23a4b9c8721f084557"
 dependencies = [
  "winapi-util",
 ]
